@@ -189,5 +189,44 @@ namespace PetPulse.API.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
+
+        // GET: api/pets/{id}/appointments
+        // Returns the full appointment history for a specific pet
+        [HttpGet("{id}/appointments")]
+        public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetPetAppointments(string id)
+        {
+            // 1. Validate ID format
+            if (!Guid.TryParse(id, out var petId)) return BadRequest("Invalid Pet ID format.");
+
+            // 2. Check if Pet exists
+            var pet = await _context.Pets.FindAsync(petId);
+            if (pet == null) return NotFound("Pet not found.");
+
+            // 3. SECURITY: Ensure the user owns this pet (or is Admin)
+            if (!User.IsInRole(UserRoles.Admin))
+            {
+                var username = User.Identity?.Name;
+                var appUser = await _userManager.FindByNameAsync(username!);
+                var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser!.Id);
+
+                // If user doesn't own the pet, block access
+                if (owner == null || pet.OwnerId != owner.Id)
+                {
+                    return NotFound(); // Hide existence of the pet
+                }
+            }
+
+            // 4. Fetch History
+            // We Include Vet and Treatments to show full details (who did it, what was done)
+            var appointments = await _context.Appointments
+                .Where(a => a.PetId == petId)
+                .Include(a => a.Vet)
+                .Include(a => a.AppointmentTreatments)
+                    .ThenInclude(at => at.Treatment)
+                .OrderByDescending(a => a.Date) // Sort by newest first (History style)
+                .ToListAsync();
+
+            return Ok(_mapper.Map<List<AppointmentDto>>(appointments));
+        }
     }
 }
