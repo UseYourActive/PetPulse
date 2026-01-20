@@ -13,7 +13,6 @@ namespace PetPulse.API
             CreateMap<CreateOwnerDto, Owner>();
 
             // Pet Mapping
-            // Guid OwnerId -> string OwnerId is handled automatically by AutoMapper
             CreateMap<Pet, PetDto>()
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Owner.FirstName + " " + src.Owner.LastName));
             CreateMap<CreatePetDto, Pet>();
@@ -21,6 +20,7 @@ namespace PetPulse.API
             // Vet Mapping
             CreateMap<Vet, VetDto>()
                 .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FirstName + " " + src.LastName));
+
             CreateMap<VetDto, Vet>();
             CreateMap<CreateVetDto, Vet>();
 
@@ -28,12 +28,11 @@ namespace PetPulse.API
             CreateMap<Treatment, TreatmentDto>();
             CreateMap<CreateTreatmentDto, Treatment>();
 
-            // Appointment Mapping (Consolidated)
+            // Appointment Mapping
             CreateMap<Appointment, AppointmentDto>()
                 .ForMember(dest => dest.PetName, opt => opt.MapFrom(src => src.Pet.Name))
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Pet.Owner.FirstName + " " + src.Pet.Owner.LastName))
                 .ForMember(dest => dest.VetName, opt => opt.MapFrom(src => src.Vet.FirstName + " " + src.Vet.LastName))
-                // Extract Treatments from the Join Table
                 .ForMember(dest => dest.Treatments, opt => opt.MapFrom(src => src.AppointmentTreatments.Select(at => at.Treatment)));
 
             CreateMap<CreateAppointmentDto, Appointment>();

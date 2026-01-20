@@ -12,9 +12,6 @@ namespace PetPulse.API.DTOs
         [MaxLength(50)]
         public string LastName { get; set; } = string.Empty;
 
-        [Required]
-        public string Specialization { get; set; } = "General";
-
         [Range(0, 60)]
         public int YearsOfExperience { get; set; }
     }

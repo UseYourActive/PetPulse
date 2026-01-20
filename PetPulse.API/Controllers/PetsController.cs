@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetPulse.API.Data;
@@ -15,12 +16,14 @@ namespace PetPulse.API.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IMapper _mapper;
         private readonly ILogger<PetsController> _logger;
+        private readonly UserManager<AppUser> _userManager;
 
-        public PetsController(ApplicationDbContext context, IMapper mapper, ILogger<PetsController> logger)
+        public PetsController(ApplicationDbContext context, IMapper mapper, ILogger<PetsController> logger, UserManager<AppUser> userManager)
         {
             _context = context;
             _mapper = mapper;
             _logger = logger;
+            _userManager = userManager;
         }
 
         // GET: api/pets?ownerId=...&search=daisy
@@ -30,20 +33,40 @@ namespace PetPulse.API.Controllers
             [FromQuery] string? ownerId,
             [FromQuery] string? search)
         {
-            _logger.LogInformation("Fetching pets. Filter Owner: {OwnerId}, Search: {Search}", ownerId, search);
-
             var query = _context.Pets.Include(p => p.Owner).AsQueryable();
 
-            // 1. Filter by Owner (Crucial for "My Pets" page)
-            if (!string.IsNullOrEmpty(ownerId) && Guid.TryParse(ownerId, out var oId))
+            // 1. SECURITY FILTER: Identify the user
+            // If the user is NOT an Admin, we MUST force the filter to their own OwnerId.
+            if (!User.IsInRole(UserRoles.Admin))
             {
-                query = query.Where(p => p.OwnerId == oId);
+                var username = User.Identity?.Name;
+                if (username != null)
+                {
+                    // Find the AppUser, then find the connected Owner profile
+                    var appUser = await _userManager.FindByNameAsync(username);
+                    if (appUser != null)
+                    {
+                        var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser.Id);
+                        if (owner != null)
+                        {
+                            // FORCE the filter: User can ONLY see their own pets
+                            query = query.Where(p => p.OwnerId == owner.Id);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // If Admin, allow manual filtering via the query parameter
+                if (!string.IsNullOrEmpty(ownerId) && Guid.TryParse(ownerId, out var oId))
+                {
+                    query = query.Where(p => p.OwnerId == oId);
+                }
             }
 
-            // 2. Search by Name (Meets Search requirement)
+            // 2. Search Logic
             if (!string.IsNullOrEmpty(search))
             {
-                // Case-insensitive search
                 query = query.Where(p => p.Name.ToLower().Contains(search.ToLower()));
             }
 
@@ -63,6 +86,25 @@ namespace PetPulse.API.Controllers
 
             if (pet == null) return NotFound();
 
+            // SECURITY CHECK: If standard user, prevent accessing someone else's pet via direct ID
+            if (!User.IsInRole(UserRoles.Admin))
+            {
+                var username = User.Identity?.Name;
+                if (username != null)
+                {
+                    var appUser = await _userManager.FindByNameAsync(username);
+                    if (appUser != null)
+                    {
+                        var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser.Id);
+                        // If the pet doesn't belong to the logged-in owner, return Not Found (or Forbidden)
+                        if (owner != null && pet.OwnerId != owner.Id)
+                        {
+                            return NotFound(); // Hide existence of other pets
+                        }
+                    }
+                }
+            }
+
             return Ok(_mapper.Map<PetDto>(pet));
         }
 
@@ -71,62 +113,80 @@ namespace PetPulse.API.Controllers
         [Authorize]
         public async Task<ActionResult<PetDto>> CreatePet(CreatePetDto createPetDto)
         {
-            // Validate Owner ID format
             if (!Guid.TryParse(createPetDto.OwnerId, out var ownerId))
                 return BadRequest("Invalid Owner ID format.");
 
-            // Check if Owner exists
+            // Security: Ensure User isn't creating a pet for someone else
+            if (!User.IsInRole(UserRoles.Admin))
+            {
+                var username = User.Identity?.Name;
+                var appUser = await _userManager.FindByNameAsync(username!);
+                var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser!.Id);
+
+                if (owner == null || owner.Id != ownerId)
+                {
+                    return BadRequest("You can only create pets for yourself.");
+                }
+            }
+
             var ownerExists = await _context.Owners.AnyAsync(o => o.Id == ownerId);
             if (!ownerExists) return BadRequest("OwnerId does not exist.");
 
             var pet = _mapper.Map<Pet>(createPetDto);
-            pet.Id = Guid.NewGuid(); // Explicitly create new ID
-            pet.OwnerId = ownerId;   // Link to owner
+            pet.Id = Guid.NewGuid();
+            pet.OwnerId = ownerId;
 
             _context.Pets.Add(pet);
             await _context.SaveChangesAsync();
 
-            // Load Owner for the return DTO
             await _context.Entry(pet).Reference(p => p.Owner).LoadAsync();
 
             return CreatedAtAction(nameof(GetPet), new { id = pet.Id.ToString() }, _mapper.Map<PetDto>(pet));
         }
 
-        // PUT: api/pets/{guid}
         [HttpPut("{id}")]
         [Authorize]
         public async Task<IActionResult> UpdatePet(string id, [FromBody] CreatePetDto dto)
         {
             if (!Guid.TryParse(id, out var petId)) return BadRequest("Invalid ID.");
-
             var pet = await _context.Pets.FindAsync(petId);
             if (pet == null) return NotFound();
 
-            _mapper.Map(dto, pet);
-
-            // Ensure OwnerId remains valid if it was changed
-            if (Guid.TryParse(dto.OwnerId, out var newOwnerId))
+            // Security Check
+            if (!User.IsInRole(UserRoles.Admin))
             {
-                pet.OwnerId = newOwnerId;
+                var username = User.Identity?.Name;
+                var appUser = await _userManager.FindByNameAsync(username!);
+                var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser!.Id);
+                if (owner != null && pet.OwnerId != owner.Id) return Forbid();
             }
+
+            _mapper.Map(dto, pet);
+            if (Guid.TryParse(dto.OwnerId, out var newOwnerId)) pet.OwnerId = newOwnerId;
 
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        // DELETE: api/pets/{guid}
         [HttpDelete("{id}")]
         [Authorize]
         public async Task<IActionResult> DeletePet(string id)
         {
             if (!Guid.TryParse(id, out var petId)) return BadRequest("Invalid ID.");
-
             var pet = await _context.Pets.FindAsync(petId);
             if (pet == null) return NotFound();
 
+            // Security Check
+            if (!User.IsInRole(UserRoles.Admin))
+            {
+                var username = User.Identity?.Name;
+                var appUser = await _userManager.FindByNameAsync(username!);
+                var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser!.Id);
+                if (owner != null && pet.OwnerId != owner.Id) return Forbid();
+            }
+
             _context.Pets.Remove(pet);
             await _context.SaveChangesAsync();
-
             return NoContent();
         }
     }
