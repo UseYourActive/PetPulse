@@ -1,0 +1,1766 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix. The content has been processed where empty lines have been removed.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: **/*.cs, **/Dockerfile, **/docker-compose.yml, **/appsettings.json
+- Files matching these patterns are excluded: **/bin/**, **/obj/**, **/.vs/**, **/.idea/**, **/Properties/**, **/Connected Services/**, **/Migrations/**, **/*.http, **/*.user, **/*.suo, **/*.dll, **/*.exe, **/*.pdb
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Empty lines have been removed from all files
+</notes>
+
+<additional_info>
+
+</additional_info>
+
+</file_summary>
+
+<directory_structure>
+appsettings.json
+Controllers/AppointmentsController.cs
+Controllers/AuthController.cs
+Controllers/OwnersController.cs
+Controllers/PetsController.cs
+Controllers/ReviewsController.cs
+Controllers/TreatmentsController.cs
+Controllers/VetsController.cs
+Data/ApplicationDbContext.cs
+Data/DbInitializer.cs
+docker-compose.yml
+Dockerfile
+DTOs/AddTreatmentDto.cs
+DTOs/AppointmentDto.cs
+DTOs/AuthResponseDto.cs
+DTOs/CreateAppointmentDto.cs
+DTOs/CreateOwnerDto.cs
+DTOs/CreatePetDto.cs
+DTOs/CreateReviewDto.cs
+DTOs/CreateTreatmentDto.cs
+DTOs/CreateVetDto.cs
+DTOs/LoginDto.cs
+DTOs/OwnerDto.cs
+DTOs/PetDto.cs
+DTOs/RegisterDto.cs
+DTOs/ReviewDto.cs
+DTOs/TreatmentDto.cs
+DTOs/VetDto.cs
+Enums/AppointmentStatus.cs
+MappingProfile.cs
+Models/Appointment.cs
+Models/AppointmentTreatment.cs
+Models/AppUser.cs
+Models/Owner.cs
+Models/Pet.cs
+Models/Review.cs
+Models/Treatment.cs
+Models/UserRoles.cs
+Models/Vet.cs
+Program.cs
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="appsettings.json">
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=127.0.0.1;Port=5432;Database=petpulsedb;Username=postgres;Password=postgres"
+  },
+  "Jwt": {
+    "Issuer": "PetPulse.API",
+    "Audience": "PetPulse.Client",
+    "Key": "e9ae8400ee6db1b04538be1f7f2f2cce39b623dd"
+  }
+}
+</file>
+
+<file path="Controllers/AppointmentsController.cs">
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PetPulse.API.Data;
+using PetPulse.API.DTOs;
+using PetPulse.API.Enums;
+using PetPulse.API.Models;
+namespace PetPulse.API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class AppointmentsController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IMapper _mapper;
+        private readonly ILogger<AppointmentsController> _logger;
+        public AppointmentsController(ApplicationDbContext context,
+            IMapper mapper,
+            ILogger<AppointmentsController> logger)
+        {
+            _context = context;
+            _mapper = mapper;
+            _logger = logger;
+        }
+        // GET: api/appointments?page=1&pageSize=10&sortOrder=date_desc&filterDate=2023-10-01
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetAppointments(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? sortOrder = "date_desc",
+            [FromQuery] DateTime? filterDate = null)
+        {
+            _logger.LogInformation("Fetching appointments. Page: {Page}, Sort: {Sort}", page, sortOrder);
+            var query = _context.Appointments
+                .Include(a => a.Vet)
+                .Include(a => a.Pet)
+                    .ThenInclude(p => p.Owner)
+                .Include(a => a.AppointmentTreatments)
+                    .ThenInclude(at => at.Treatment)
+                .AsQueryable();
+            // 1. Filtering (Date)
+            if (filterDate.HasValue)
+            {
+                // Compare just the Date part, ignoring time
+                query = query.Where(a => a.Date.Date == filterDate.Value.Date);
+            }
+            // 2. Sorting
+            switch (sortOrder?.ToLower())
+            {
+                case "date_asc":
+                    query = query.OrderBy(a => a.Date);
+                    break;
+                case "status":
+                    query = query.OrderBy(a => a.Status);
+                    break;
+                case "date_desc":
+                default:
+                    query = query.OrderByDescending(a => a.Date);
+                    break;
+            }
+            // 3. Pagination
+            var appointments = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            return Ok(_mapper.Map<List<AppointmentDto>>(appointments));
+        }
+        // GET: api/appointments/{guid}
+        [HttpGet("{id}")]
+        public async Task<ActionResult<AppointmentDto>> GetAppointment(string id)
+        {
+            if (!Guid.TryParse(id, out var appointmentId)) return BadRequest("Invalid ID format.");
+            var appointment = await _context.Appointments
+                .Include(a => a.Vet)
+                .Include(a => a.Pet)
+                    .ThenInclude(p => p.Owner)
+                .Include(a => a.AppointmentTreatments)
+                    .ThenInclude(at => at.Treatment)
+                .FirstOrDefaultAsync(a => a.Id == appointmentId);
+            if (appointment == null) return NotFound();
+            return Ok(_mapper.Map<AppointmentDto>(appointment));
+        }
+        // POST: api/appointments
+        [HttpPost]
+        [Authorize]
+        public async Task<ActionResult<AppointmentDto>> CreateAppointment(CreateAppointmentDto dto)
+        {
+            if (!Guid.TryParse(dto.PetId, out var petId)) return BadRequest("Invalid Pet ID.");
+            if (!Guid.TryParse(dto.VetId, out var vetId)) return BadRequest("Invalid Vet ID.");
+            // 1. Validate Relations
+            if (!await _context.Pets.AnyAsync(p => p.Id == petId)) return BadRequest("Pet not found.");
+            if (!await _context.Vets.AnyAsync(v => v.Id == vetId)) return BadRequest("Vet not found.");
+            // 2. Map & Save
+            var appointment = _mapper.Map<Appointment>(dto);
+            appointment.Id = Guid.NewGuid(); // Explicit GUID
+            appointment.PetId = petId;
+            appointment.VetId = vetId;
+            appointment.Status = AppointmentStatus.Scheduled;
+            _context.Appointments.Add(appointment);
+            await _context.SaveChangesAsync();
+            // 3. Optimized Reload (Single Query instead of 3 explicit loads)
+            var fullAppointment = await _context.Appointments
+                .Include(a => a.Vet)
+                .Include(a => a.Pet)
+                    .ThenInclude(p => p.Owner)
+                .FirstOrDefaultAsync(a => a.Id == appointment.Id);
+            return CreatedAtAction(nameof(GetAppointment), new { id = appointment.Id.ToString() }, _mapper.Map<AppointmentDto>(fullAppointment));
+        }
+        // PUT: api/appointments/{guid}/status
+        [HttpPut("{id}/status")]
+        [Authorize]
+        public async Task<IActionResult> UpdateStatus(string id, [FromBody] AppointmentStatus newStatus)
+        {
+            if (!Guid.TryParse(id, out var appointmentId)) return BadRequest("Invalid ID format.");
+            var appointment = await _context.Appointments.FindAsync(appointmentId);
+            if (appointment == null) return NotFound();
+            appointment.Status = newStatus;
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+        // DELETE: api/appointments/{guid}
+        [HttpDelete("{id}")]
+        [Authorize]
+        public async Task<IActionResult> DeleteAppointment(string id)
+        {
+            if (!Guid.TryParse(id, out var appointmentId)) return BadRequest("Invalid ID format.");
+            var appointment = await _context.Appointments.FindAsync(appointmentId);
+            if (appointment == null) return NotFound();
+            _context.Appointments.Remove(appointment);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+    }
+}
+</file>
+
+<file path="Controllers/AuthController.cs">
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using PetPulse.API.Data;
+using PetPulse.API.DTOs;
+using PetPulse.API.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+namespace PetPulse.API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class AuthController : ControllerBase
+    {
+        private readonly UserManager<AppUser> _userManager;
+        private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<AuthController> _logger;
+        public AuthController(
+            UserManager<AppUser> userManager,
+            RoleManager<IdentityRole> roleManager,
+            ApplicationDbContext context,
+            IConfiguration configuration,
+            ILogger<AuthController> logger)
+        {
+            _userManager = userManager;
+            _roleManager = roleManager;
+            _context = context;
+            _configuration = configuration;
+            _logger = logger;
+        }
+        // POST: api/auth/register
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterDto model)
+        {
+            _logger.LogInformation("Register attempt for username: {Username}, Email: {Email}", model.Username, model.Email);
+            var userExists = await _userManager.FindByNameAsync(model.Username);
+            if (userExists != null)
+            {
+                return BadRequest("User already exists!");
+            }
+            // This ensures we don't create a User without an Owner profile if the second step fails.
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // 1. Create Identity User
+                AppUser user = new()
+                {
+                    Email = model.Email,
+                    SecurityStamp = Guid.NewGuid().ToString(),
+                    UserName = model.Username
+                };
+                var result = await _userManager.CreateAsync(user, model.Password);
+                if (!result.Succeeded)
+                {
+                    return BadRequest(string.Join(", ", result.Errors.Select(e => e.Description)));
+                }
+                // 2. Assign Role
+                await _userManager.AddToRoleAsync(user, UserRoles.User);
+                // 3. Create Owner Profile
+                var newOwner = new Owner
+                {
+                    FirstName = model.FirstName,
+                    LastName = model.LastName,
+                    Email = model.Email,
+                    PhoneNumber = model.PhoneNumber ?? "",
+                    AppUserId = user.Id
+                };
+                _context.Owners.Add(newOwner);
+                await _context.SaveChangesAsync();
+                // Commit Transaction
+                await transaction.CommitAsync();
+                // 4. Generate Token & Return Response
+                var authClaims = GetClaims(user, new List<string> { UserRoles.User });
+                var token = GetToken(authClaims);
+                return Ok(new AuthResponseDto
+                {
+                    Token = new JwtSecurityTokenHandler().WriteToken(token),
+                    Username = user.UserName!,
+                    Email = user.Email!,
+                    Role = UserRoles.User,
+                    OwnerId = newOwner.Id.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Registration failed. Transaction rolled back.");
+                return StatusCode(500, "Registration failed.");
+            }
+        }
+        // POST: api/auth/login
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDto model)
+        {
+            var user = await _userManager.FindByNameAsync(model.Username);
+            if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
+            {
+                var userRoles = await _userManager.GetRolesAsync(user);
+                var authClaims = GetClaims(user, userRoles);
+                var token = GetToken(authClaims);
+                // Safe Owner Retrieval
+                var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == user.Id);
+                // If I am Admin, 'owner' is null. Using owner!.AppUserId would CRASH the server.
+                // We handle null by returning string.Empty or "0".
+                var ownerId = owner?.Id.ToString() ?? string.Empty;
+                return Ok(new AuthResponseDto
+                {
+                    Token = new JwtSecurityTokenHandler().WriteToken(token),
+                    Username = user.UserName!,
+                    Email = user.Email!,
+                    Role = userRoles.FirstOrDefault() ?? "User",
+                    OwnerId = ownerId // Return the Profile ID
+                });
+            }
+            return Unauthorized();
+        }
+        // Helper to extract Claims logic
+        private List<Claim> GetClaims(AppUser user, IList<string> roles)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.UserName!),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            };
+            foreach (var role in roles) claims.Add(new Claim(ClaimTypes.Role, role));
+            return claims;
+        }
+        private JwtSecurityToken GetToken(List<Claim> authClaims)
+        {
+            var key = _configuration["Jwt:Key"];
+            if (string.IsNullOrEmpty(key)) throw new Exception("JWT Key missing");
+            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+            return new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                expires: DateTime.Now.AddHours(3),
+                claims: authClaims,
+                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+                );
+        }
+    }
+}
+</file>
+
+<file path="Controllers/OwnersController.cs">
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PetPulse.API.Data;
+using PetPulse.API.DTOs;
+using PetPulse.API.Models;
+namespace PetPulse.API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class OwnersController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IMapper _mapper;
+        private readonly ILogger<OwnersController> _logger;
+        public OwnersController(ApplicationDbContext context, IMapper mapper, ILogger<OwnersController> logger)
+        {
+            _context = context;
+            _mapper = mapper;
+            _logger = logger;
+        }
+        // GET: api/owners
+        [HttpGet]
+        [Authorize(Roles = "Admin")] // Only Admin should see a list of ALL users
+        public async Task<ActionResult<IEnumerable<OwnerDto>>> GetOwners()
+        {
+            _logger.LogInformation("Fetching all owners from database...");
+            var owners = await _context.Owners.ToListAsync();
+            return Ok(_mapper.Map<List<OwnerDto>>(owners));
+        }
+        // GET: api/owners/{guid}
+        [HttpGet("{id}")]
+        [Authorize] // Any logged in user
+        public async Task<ActionResult<OwnerDto>> GetOwner(string id)
+        {
+            if (!Guid.TryParse(id, out var ownerId)) return BadRequest("Invalid ID format.");
+            _logger.LogInformation("Fetching details for Owner ID: {Id}", id);
+            var owner = await _context.Owners.FindAsync(ownerId);
+            if (owner == null) return NotFound();
+            return Ok(_mapper.Map<OwnerDto>(owner));
+        }
+        // POST: api/owners
+        // NOTE: This is rarely used directly because Register() creates the owner.
+        // But we keep it for Admin purposes or manual creation.
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<OwnerDto>> CreateOwner(CreateOwnerDto createOwnerDto)
+        {
+            var owner = _mapper.Map<Owner>(createOwnerDto);
+            // Since we use Guids, EF Core usually generates them, but we can be explicit:
+            owner.Id = Guid.NewGuid();
+            _context.Owners.Add(owner);
+            await _context.SaveChangesAsync();
+            return CreatedAtAction(nameof(GetOwner), new { id = owner.Id.ToString() }, _mapper.Map<OwnerDto>(owner));
+        }
+        // PUT: api/owners/{guid}
+        [HttpPut("{id}")]
+        [Authorize]
+        public async Task<IActionResult> UpdateOwner(string id, [FromBody] CreateOwnerDto dto)
+        {
+            if (!Guid.TryParse(id, out var ownerId)) return BadRequest("Invalid ID format.");
+            var owner = await _context.Owners.FindAsync(ownerId);
+            if (owner == null) return NotFound();
+            // Map new values onto existing entity
+            _mapper.Map(dto, owner);
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.Owners.Any(o => o.Id == ownerId)) return NotFound();
+                else throw;
+            }
+            return NoContent(); // 204 Success
+        }
+        // DELETE: api/owners/{guid}
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")] // Critical: Only Admin should delete users this way
+        public async Task<IActionResult> DeleteOwner(string id)
+        {
+            if (!Guid.TryParse(id, out var ownerId)) return BadRequest("Invalid ID format.");
+            var owner = await _context.Owners.FindAsync(ownerId);
+            if (owner == null) return NotFound();
+            _context.Owners.Remove(owner);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+    }
+}
+</file>
+
+<file path="Controllers/PetsController.cs">
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PetPulse.API.Data;
+using PetPulse.API.DTOs;
+using PetPulse.API.Models;
+namespace PetPulse.API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class PetsController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IMapper _mapper;
+        private readonly ILogger<PetsController> _logger;
+        public PetsController(ApplicationDbContext context, IMapper mapper, ILogger<PetsController> logger)
+        {
+            _context = context;
+            _mapper = mapper;
+            _logger = logger;
+        }
+        // GET: api/pets?ownerId=...&search=daisy
+        // Meets requirement: Filtering and Searching
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<PetDto>>> GetPets(
+            [FromQuery] string? ownerId,
+            [FromQuery] string? search)
+        {
+            _logger.LogInformation("Fetching pets. Filter Owner: {OwnerId}, Search: {Search}", ownerId, search);
+            var query = _context.Pets.Include(p => p.Owner).AsQueryable();
+            // 1. Filter by Owner (Crucial for "My Pets" page)
+            if (!string.IsNullOrEmpty(ownerId) && Guid.TryParse(ownerId, out var oId))
+            {
+                query = query.Where(p => p.OwnerId == oId);
+            }
+            // 2. Search by Name (Meets Search requirement)
+            if (!string.IsNullOrEmpty(search))
+            {
+                // Case-insensitive search
+                query = query.Where(p => p.Name.ToLower().Contains(search.ToLower()));
+            }
+            var pets = await query.ToListAsync();
+            return Ok(_mapper.Map<List<PetDto>>(pets));
+        }
+        // GET: api/pets/{guid}
+        [HttpGet("{id}")]
+        public async Task<ActionResult<PetDto>> GetPet(string id)
+        {
+            if (!Guid.TryParse(id, out var petId)) return BadRequest("Invalid ID.");
+            var pet = await _context.Pets
+                                    .Include(p => p.Owner)
+                                    .FirstOrDefaultAsync(p => p.Id == petId);
+            if (pet == null) return NotFound();
+            return Ok(_mapper.Map<PetDto>(pet));
+        }
+        // POST: api/pets
+        [HttpPost]
+        [Authorize]
+        public async Task<ActionResult<PetDto>> CreatePet(CreatePetDto createPetDto)
+        {
+            // Validate Owner ID format
+            if (!Guid.TryParse(createPetDto.OwnerId, out var ownerId))
+                return BadRequest("Invalid Owner ID format.");
+            // Check if Owner exists
+            var ownerExists = await _context.Owners.AnyAsync(o => o.Id == ownerId);
+            if (!ownerExists) return BadRequest("OwnerId does not exist.");
+            var pet = _mapper.Map<Pet>(createPetDto);
+            pet.Id = Guid.NewGuid(); // Explicitly create new ID
+            pet.OwnerId = ownerId;   // Link to owner
+            _context.Pets.Add(pet);
+            await _context.SaveChangesAsync();
+            // Load Owner for the return DTO
+            await _context.Entry(pet).Reference(p => p.Owner).LoadAsync();
+            return CreatedAtAction(nameof(GetPet), new { id = pet.Id.ToString() }, _mapper.Map<PetDto>(pet));
+        }
+        // PUT: api/pets/{guid}
+        [HttpPut("{id}")]
+        [Authorize]
+        public async Task<IActionResult> UpdatePet(string id, [FromBody] CreatePetDto dto)
+        {
+            if (!Guid.TryParse(id, out var petId)) return BadRequest("Invalid ID.");
+            var pet = await _context.Pets.FindAsync(petId);
+            if (pet == null) return NotFound();
+            _mapper.Map(dto, pet);
+            // Ensure OwnerId remains valid if it was changed
+            if (Guid.TryParse(dto.OwnerId, out var newOwnerId))
+            {
+                pet.OwnerId = newOwnerId;
+            }
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+        // DELETE: api/pets/{guid}
+        [HttpDelete("{id}")]
+        [Authorize]
+        public async Task<IActionResult> DeletePet(string id)
+        {
+            if (!Guid.TryParse(id, out var petId)) return BadRequest("Invalid ID.");
+            var pet = await _context.Pets.FindAsync(petId);
+            if (pet == null) return NotFound();
+            _context.Pets.Remove(pet);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+    }
+}
+</file>
+
+<file path="Controllers/ReviewsController.cs">
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PetPulse.API.Data;
+using PetPulse.API.DTOs;
+using PetPulse.API.Models;
+namespace PetPulse.API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class ReviewsController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IMapper _mapper;
+        private readonly ILogger<ReviewsController> _logger;
+        public ReviewsController(ApplicationDbContext context, IMapper mapper, ILogger<ReviewsController> logger)
+        {
+            _context = context;
+            _mapper = mapper;
+            _logger = logger;
+        }
+        // GET: api/reviews?vetId=guid-string
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<ReviewDto>>> GetReviews([FromQuery] string? vetId)
+        {
+            var query = _context.Reviews.Include(r => r.Owner).AsQueryable();
+            if (!string.IsNullOrEmpty(vetId))
+            {
+                if (!Guid.TryParse(vetId, out var vId)) return BadRequest("Invalid Vet ID format.");
+                _logger.LogInformation("Fetching reviews filtered by VetId: {VetId}", vetId);
+                query = query.Where(r => r.VetId == vId);
+            }
+            else
+            {
+                _logger.LogInformation("Fetching all reviews.");
+            }
+            var reviews = await query.OrderByDescending(r => r.DatePosted).ToListAsync();
+            return Ok(_mapper.Map<List<ReviewDto>>(reviews));
+        }
+        // POST: api/reviews
+        [HttpPost]
+        [Authorize]
+        public async Task<ActionResult<ReviewDto>> CreateReview(CreateReviewDto dto)
+        {
+            // 1. Parse IDs from DTO
+            if (!Guid.TryParse(dto.VetId, out var vetId)) return BadRequest("Invalid Vet ID.");
+            if (!Guid.TryParse(dto.OwnerId, out var ownerId)) return BadRequest("Invalid Owner ID.");
+            _logger.LogInformation("Creating review. Vet: {VetId}, Owner: {OwnerId}", vetId, ownerId);
+            // 2. Validate Existence
+            if (!await _context.Vets.AnyAsync(v => v.Id == vetId)) return BadRequest("Vet not found");
+            if (!await _context.Owners.AnyAsync(o => o.Id == ownerId)) return BadRequest("Owner not found");
+            // 3. Map & Save
+            var review = _mapper.Map<Review>(dto);
+            review.Id = Guid.NewGuid(); // Explicit GUID
+            review.VetId = vetId;       // Explicit assignment
+            review.OwnerId = ownerId;   // Explicit assignment
+            review.DatePosted = DateTime.UtcNow;
+            _context.Reviews.Add(review);
+            await _context.SaveChangesAsync();
+            // 4. Reload for Owner Name
+            await _context.Entry(review).Reference(r => r.Owner).LoadAsync();
+            return Ok(_mapper.Map<ReviewDto>(review));
+        }
+        // GET: api/reviews/average/{guid}
+        [HttpGet("average/{vetId}")]
+        public async Task<ActionResult<double>> GetAverageRating(string vetId)
+        {
+            if (!Guid.TryParse(vetId, out var vId)) return BadRequest("Invalid Vet ID.");
+            var ratings = await _context.Reviews
+                .Where(r => r.VetId == vId)
+                .Select(r => r.Rating)
+                .ToListAsync();
+            if (!ratings.Any()) return Ok(0.0);
+            return Ok(ratings.Average());
+        }
+    }
+}
+</file>
+
+<file path="Controllers/TreatmentsController.cs">
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PetPulse.API.Data;
+using PetPulse.API.DTOs;
+using PetPulse.API.Models;
+namespace PetPulse.API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class TreatmentsController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IMapper _mapper;
+        private readonly ILogger<TreatmentsController> _logger;
+        public TreatmentsController(ApplicationDbContext context, IMapper mapper, ILogger<TreatmentsController> logger)
+        {
+            _context = context;
+            _mapper = mapper;
+            _logger = logger;
+        }
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<TreatmentDto>>> GetTreatments()
+        {
+            var treatments = await _context.Treatments.ToListAsync();
+            return Ok(_mapper.Map<List<TreatmentDto>>(treatments));
+        }
+        [HttpGet("{id}")]
+        public async Task<ActionResult<TreatmentDto>> GetTreatment(string id)
+        {
+            if (!Guid.TryParse(id, out var tId)) return BadRequest("Invalid ID.");
+            var treatment = await _context.Treatments.FindAsync(tId);
+            if (treatment == null) return NotFound();
+            return Ok(_mapper.Map<TreatmentDto>(treatment));
+        }
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<TreatmentDto>> CreateTreatment(CreateTreatmentDto dto)
+        {
+            var treatment = _mapper.Map<Treatment>(dto);
+            treatment.Id = Guid.NewGuid();
+            _context.Treatments.Add(treatment);
+            await _context.SaveChangesAsync();
+            return CreatedAtAction(nameof(GetTreatment), new { id = treatment.Id.ToString() }, _mapper.Map<TreatmentDto>(treatment));
+        }
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateTreatment(string id, CreateTreatmentDto dto)
+        {
+            if (!Guid.TryParse(id, out var tId)) return BadRequest("Invalid ID.");
+            var treatment = await _context.Treatments.FindAsync(tId);
+            if (treatment == null) return NotFound();
+            _mapper.Map(dto, treatment);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteTreatment(string id)
+        {
+            if (!Guid.TryParse(id, out var tId)) return BadRequest("Invalid ID.");
+            var treatment = await _context.Treatments.FindAsync(tId);
+            if (treatment == null) return NotFound();
+            try
+            {
+                _context.Treatments.Remove(treatment);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return BadRequest("Cannot delete treatment; it is attached to existing appointments.");
+            }
+            return NoContent();
+        }
+        // POST: api/treatments/{appointmentId}/treatments
+        [HttpPost("{id}/treatments")]
+        [Authorize]
+        public async Task<IActionResult> AddTreatment(string id, [FromBody] AddTreatmentDto dto)
+        {
+            // 1. Parse IDs
+            if (!Guid.TryParse(id, out var appId)) return BadRequest("Invalid Appointment ID.");
+            if (!Guid.TryParse(dto.TreatmentId, out var treatmentId)) return BadRequest("Invalid Treatment ID.");
+            // 2. Find Appointment
+            var appointment = await _context.Appointments
+                .Include(a => a.AppointmentTreatments)
+                .FirstOrDefaultAsync(a => a.Id == appId);
+            if (appointment == null) return NotFound("Appointment not found.");
+            // 3. Find Treatment
+            var treatment = await _context.Treatments.FindAsync(treatmentId);
+            if (treatment == null) return BadRequest("Treatment not found.");
+            // 4. Check Duplicates
+            if (appointment.AppointmentTreatments.Any(at => at.TreatmentId == treatmentId))
+            {
+                return Conflict("Treatment already added to this appointment.");
+            }
+            // 5. Link
+            var link = new AppointmentTreatment
+            {
+                AppointmentId = appId,
+                TreatmentId = treatmentId
+            };
+            _context.AppointmentTreatments.Add(link);
+            await _context.SaveChangesAsync();
+            return Ok("Treatment added.");
+        }
+        // DELETE: api/treatments/{appointmentId}/treatments/{treatmentId}
+        [Authorize]
+        [HttpDelete("{id}/treatments/{treatmentId}")]
+        public async Task<IActionResult> RemoveTreatment(string id, string treatmentId)
+        {
+            if (!Guid.TryParse(id, out var appId)) return BadRequest("Invalid Appointment ID.");
+            if (!Guid.TryParse(treatmentId, out var tId)) return BadRequest("Invalid Treatment ID.");
+            var link = await _context.AppointmentTreatments
+                .FirstOrDefaultAsync(at => at.AppointmentId == appId && at.TreatmentId == tId);
+            if (link == null) return NotFound("Treatment not found on this appointment.");
+            _context.AppointmentTreatments.Remove(link);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+    }
+}
+</file>
+
+<file path="Controllers/VetsController.cs">
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PetPulse.API.Data;
+using PetPulse.API.DTOs;
+using PetPulse.API.Models;
+namespace PetPulse.API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class VetsController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IMapper _mapper;
+        private readonly ILogger<VetsController> _logger;
+        public VetsController(ApplicationDbContext context, IMapper mapper, ILogger<VetsController> logger)
+        {
+            _context = context;
+            _mapper = mapper;
+            _logger = logger;
+        }
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<VetDto>>> GetVets()
+        {
+            var vets = await _context.Vets.ToListAsync();
+            return Ok(_mapper.Map<List<VetDto>>(vets));
+        }
+        [HttpGet("{id}")]
+        public async Task<ActionResult<VetDto>> GetVet(string id)
+        {
+            if (!Guid.TryParse(id, out var vId)) return BadRequest("Invalid ID.");
+            var vet = await _context.Vets.FindAsync(vId);
+            if (vet == null) return NotFound();
+            return Ok(_mapper.Map<VetDto>(vet));
+        }
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<VetDto>> CreateVet(CreateVetDto createVetDto)
+        {
+            var vet = _mapper.Map<Vet>(createVetDto);
+            vet.Id = Guid.NewGuid();
+            _context.Vets.Add(vet);
+            await _context.SaveChangesAsync();
+            return CreatedAtAction(nameof(GetVet), new { id = vet.Id.ToString() }, _mapper.Map<VetDto>(vet));
+        }
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateVet(string id, CreateVetDto updateVetDto)
+        {
+            if (!Guid.TryParse(id, out var vId)) return BadRequest("Invalid ID.");
+            var vet = await _context.Vets.FindAsync(vId);
+            if (vet == null) return NotFound();
+            _mapper.Map(updateVetDto, vet);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteVet(string id)
+        {
+            if (!Guid.TryParse(id, out var vId)) return BadRequest("Invalid ID.");
+            var vet = await _context.Vets.FindAsync(vId);
+            if (vet == null) return NotFound();
+            _context.Vets.Remove(vet);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+    }
+}
+</file>
+
+<file path="Data/ApplicationDbContext.cs">
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using PetPulse.API.Models;
+namespace PetPulse.API.Data
+{
+    // Inheriting from IdentityDbContext gives us all the User/Role tables automatically
+    public class ApplicationDbContext : IdentityDbContext<AppUser>
+    {
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options)
+        {
+        }
+        // Define your custom tables here
+        public DbSet<Owner> Owners { get; set; }
+        public DbSet<Pet> Pets { get; set; }
+        public DbSet<Vet> Vets { get; set; }
+        public DbSet<Appointment> Appointments { get; set; }
+        public DbSet<Treatment> Treatments { get; set; }
+        public DbSet<AppointmentTreatment> AppointmentTreatments { get; set; }
+        public DbSet<Review> Reviews { get; set; }
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder); // CRITICAL: Required for Identity to work
+            // Configure the One-to-Many relationship explicitly (optional but good practice)
+            builder.Entity<Owner>()
+                .HasMany(o => o.Pets)
+                .WithOne(p => p.Owner)
+                .HasForeignKey(p => p.OwnerId)
+                .OnDelete(DeleteBehavior.Cascade); // If Owner is deleted, delete their Pets
+            builder.Entity<AppointmentTreatment>()
+                .HasKey(at => new { at.AppointmentId, at.TreatmentId });
+            builder.Entity<AppointmentTreatment>()
+                .HasOne(at => at.Appointment)
+                .WithMany(a => a.AppointmentTreatments)
+                .HasForeignKey(at => at.AppointmentId);
+            builder.Entity<AppointmentTreatment>()
+                .HasOne(at => at.Treatment)
+                .WithMany(t => t.AppointmentTreatments)
+                .HasForeignKey(at => at.TreatmentId);
+            builder.Entity<Review>()
+                .HasOne(r => r.Vet)
+                .WithMany(v => v.Reviews)
+                .HasForeignKey(r => r.VetId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+    }
+}
+</file>
+
+<file path="Data/DbInitializer.cs">
+using Microsoft.AspNetCore.Identity;
+using PetPulse.API.Enums;
+using PetPulse.API.Models;
+using Microsoft.EntityFrameworkCore;
+namespace PetPulse.API.Data
+{
+    public static class DbInitializer
+    {
+        public static async Task SeedAsync(IApplicationBuilder applicationBuilder)
+        {
+            using (var serviceScope = applicationBuilder.ApplicationServices.CreateScope())
+            {
+                var context = serviceScope.ServiceProvider.GetService<ApplicationDbContext>();
+                var roleManager = serviceScope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+                var userManager = serviceScope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+                // 1. Ensure Database Exists
+                context.Database.EnsureCreated();
+                // ==============================
+                // 2. SEED ROLES & ADMIN USER
+                // ==============================
+                if (!await roleManager.RoleExistsAsync(UserRoles.Admin))
+                    await roleManager.CreateAsync(new IdentityRole(UserRoles.Admin));
+                if (!await roleManager.RoleExistsAsync(UserRoles.User))
+                    await roleManager.CreateAsync(new IdentityRole(UserRoles.User));
+                // Seed Default Admin User
+                var adminEmail = "admin@petpulse.com";
+                var adminUser = await userManager.FindByEmailAsync(adminEmail);
+                if (adminUser == null)
+                {
+                    var newAdmin = new AppUser()
+                    {
+                        UserName = "admin",
+                        Email = adminEmail,
+                        SecurityStamp = Guid.NewGuid().ToString(),
+                        EmailConfirmed = true,
+                        FullName = "System Admin"
+                    };
+                    await userManager.CreateAsync(newAdmin, "Admin@123");
+                    await userManager.AddToRoleAsync(newAdmin, UserRoles.Admin);
+                }
+                // ==============================
+                // 3. SEED BUSINESS DATA
+                // ==============================
+                // If owners exist, we assume data is already seeded
+                if (context.Owners.Any())
+                {
+                    return;
+                }
+                // 3.1 Create Vets (Removed Specialization)
+                var vets = new List<Vet>()
+                {
+                    new Vet() { FirstName = "Gregory", LastName = "House", YearsOfExperience = 20 },
+                    new Vet() { FirstName = "James", LastName = "Wilson", YearsOfExperience = 15 },
+                    new Vet() { FirstName = "Lisa", LastName = "Cuddy", YearsOfExperience = 18 }
+                };
+                context.Vets.AddRange(vets);
+                await context.SaveChangesAsync(); // Save to generate GUIDs
+                // 3.2 Create Owners & Pets
+                var owners = new List<Owner>()
+                {
+                    new Owner()
+                    {
+                        FirstName = "John",
+                        LastName = "Wick",
+                        Email = "john@continental.com",
+                        PhoneNumber = "555-0100",
+                        Pets = new List<Pet>()
+                        {
+                            new Pet() { Name = "Daisy", Type = "Cat", Age = 1 }
+                        }
+                    },
+                    new Owner()
+                    {
+                        FirstName = "Shaggy",
+                        LastName = "Rogers",
+                        Email = "shaggy@mystery.inc",
+                        PhoneNumber = "555-0200",
+                        Pets = new List<Pet>()
+                        {
+                            new Pet() { Name = "Scooby", Type = "Dog", Age = 7 }
+                        }
+                    }
+                };
+                context.Owners.AddRange(owners);
+                await context.SaveChangesAsync(); // Save to generate GUIDs
+                // 3.3 Create Treatments
+                var vaccine = new Treatment() { Name = "Rabies Vaccine", Cost = 25.00m };
+                var surgery = new Treatment() { Name = "General Surgery", Cost = 150.00m };
+                var checkup = new Treatment() { Name = "General Checkup", Cost = 50.00m };
+                context.Treatments.AddRange(vaccine, surgery, checkup);
+                await context.SaveChangesAsync(); // Save to generate GUIDs
+                // 3.4 Create Appointments (Link via retrieved GUIDs)
+                var vetHouse = context.Vets.First(v => v.LastName == "House");
+                var petScooby = context.Pets.First(p => p.Name == "Scooby");
+                var appointments = new List<Appointment>()
+                {
+                    new Appointment()
+                    {
+                        Date = DateTime.UtcNow.AddDays(1), // Tomorrow
+                        Description = "Excessive eating habits checkup",
+                        Status = AppointmentStatus.Scheduled,
+                        VetId = vetHouse.Id, // Valid GUID
+                        PetId = petScooby.Id, // Valid GUID
+                        // Link Treatments
+                        AppointmentTreatments = new List<AppointmentTreatment>()
+                        {
+                            new AppointmentTreatment { TreatmentId = checkup.Id }
+                        }
+                    },
+                    new Appointment()
+                    {
+                        Date = DateTime.UtcNow.AddDays(-5), // 5 Days ago
+                        Description = "Routine Vaccination",
+                        Status = AppointmentStatus.Completed,
+                        Diagnosis = "Healthy, gave treat.",
+                        VetId = vetHouse.Id, // Valid GUID
+                        PetId = petScooby.Id, // Valid GUID
+                        AppointmentTreatments = new List<AppointmentTreatment>()
+                        {
+                            new AppointmentTreatment { TreatmentId = vaccine.Id },
+                            new AppointmentTreatment { TreatmentId = checkup.Id }
+                        }
+                    }
+                };
+                context.Appointments.AddRange(appointments);
+                await context.SaveChangesAsync();
+            }
+        }
+    }
+}
+</file>
+
+<file path="docker-compose.yml">
+version: '3.8'
+services:
+  petpulse-api:
+    image: petpulse-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      # OVERRIDE the file setting to point to the db container
+      - ConnectionStrings__DefaultConnection=Host=petpulse-db;Port=5432;Database=petpulsedb;Username=postgres;Password=postgres
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+    depends_on:
+      - petpulse-db
+  petpulse-db:
+    image: postgres:latest
+    container_name: petpulse_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petpulsedb
+    ports:
+      - "5432:5432"
+    volumes:
+      - petpulse_data:/var/lib/postgresql/data
+  db-admin:
+    image: adminer
+    restart: always
+    ports:
+      - "8082:8080" # Access at localhost:8082
+    depends_on:
+      - petpulse-db
+volumes:
+  petpulse_data:
+</file>
+
+<file path="Dockerfile">
+# See https://aka.ms/customizecontainer to learn how to customize your debug container
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+USER $APP_UID
+WORKDIR /app
+EXPOSE 8080
+EXPOSE 8081
+
+# This stage is used to build the service project
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src
+# CHANGED: Copy csproj from current directory, not from PetPulse.API/ folder
+COPY ["PetPulse.API.csproj", "."]
+RUN dotnet restore "./PetPulse.API.csproj"
+COPY . .
+WORKDIR "/src/."
+RUN dotnet build "./PetPulse.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+# This stage is used to publish the service project
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "./PetPulse.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+
+# Final stage
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "PetPulse.API.dll"]
+</file>
+
+<file path="DTOs/AddTreatmentDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class AddTreatmentDto
+    {
+        [Required]
+        public string TreatmentId { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/AppointmentDto.cs">
+using PetPulse.API.Enums;
+namespace PetPulse.API.DTOs
+{
+    public class AppointmentDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string PetName { get; set; } = string.Empty;
+        public string OwnerName { get; set; } = string.Empty;
+        public string VetName { get; set; } = string.Empty;
+        public List<TreatmentDto> Treatments { get; set; } = new List<TreatmentDto>();
+    }
+}
+</file>
+
+<file path="DTOs/AuthResponseDto.cs">
+namespace PetPulse.API.DTOs
+{
+    public class AuthResponseDto
+    {
+        public string Token { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public string OwnerId { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/CreateAppointmentDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class CreateAppointmentDto
+    {
+        [Required]
+        public DateTime Date { get; set; }
+        [Required]
+        public string Description { get; set; } = string.Empty;
+        [Required]
+        public string PetId { get; set; } = string.Empty;
+        [Required]
+        public string VetId { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/CreateOwnerDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class CreateOwnerDto
+    {
+        [Required]
+        [MaxLength(50)]
+        public string FirstName { get; set; } = string.Empty;
+        [Required]
+        [MaxLength(50)]
+        public string LastName { get; set; } = string.Empty;
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+        [Phone]
+        public string PhoneNumber { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/CreatePetDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class CreatePetDto
+    {
+        [Required]
+        [MaxLength(50)]
+        public string Name { get; set; } = string.Empty;
+        [Required]
+        [MaxLength(50)]
+        public string Type { get; set; } = string.Empty;
+        [Range(0, 30)]
+        public int Age { get; set; }
+        [Required]
+        public string OwnerId { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/CreateReviewDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class CreateReviewDto
+    {
+        [Required]
+        [Range(1, 5)]
+        public int Rating { get; set; }
+        [MaxLength(500)]
+        public string Comment { get; set; } = string.Empty;
+        [Required]
+        public string VetId { get; set; } = string.Empty;
+        [Required]
+        public string OwnerId { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/CreateTreatmentDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class CreateTreatmentDto
+    {
+        [Required]
+        [MaxLength(100)]
+        public string Name { get; set; } = string.Empty;
+        [Required]
+        [Range(0, 10000)] // Security: Prevent negative prices or absurdly high ones
+        public decimal Cost { get; set; }
+    }
+}
+</file>
+
+<file path="DTOs/CreateVetDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class CreateVetDto
+    {
+        [Required]
+        [MaxLength(50)]
+        public string FirstName { get; set; } = string.Empty;
+        [Required]
+        [MaxLength(50)]
+        public string LastName { get; set; } = string.Empty;
+        [Required]
+        public string Specialization { get; set; } = "General";
+        [Range(0, 60)]
+        public int YearsOfExperience { get; set; }
+    }
+}
+</file>
+
+<file path="DTOs/LoginDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class LoginDto
+    {
+        [Required]
+        public string Username { get; set; } = string.Empty;
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/OwnerDto.cs">
+namespace PetPulse.API.DTOs
+{
+    public class OwnerDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string PhoneNumber { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/PetDto.cs">
+namespace PetPulse.API.DTOs
+{
+    public class PetDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public int Age { get; set; }
+        public string OwnerId { get; set; } = string.Empty;
+        public string OwnerName { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/RegisterDto.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.DTOs
+{
+    public class RegisterDto
+    {
+        [Required]
+        public string Username { get; set; } = string.Empty;
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+        [Required]
+        public string Password { get; set; } = string.Empty;
+        [Required]
+        public string FirstName { get; set; } = string.Empty;
+        [Required]
+        public string LastName { get; set; } = string.Empty;
+        [Required]
+        public string PhoneNumber { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/ReviewDto.cs">
+namespace PetPulse.API.DTOs
+{
+    public class ReviewDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public string Comment { get; set; } = string.Empty;
+        public DateTime DatePosted { get; set; }
+        public string OwnerName { get; set; } = string.Empty;
+        public string VetId { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="DTOs/TreatmentDto.cs">
+namespace PetPulse.API.DTOs
+{
+    public class TreatmentDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public decimal Cost { get; set; }
+    }
+}
+</file>
+
+<file path="DTOs/VetDto.cs">
+namespace PetPulse.API.DTOs
+{
+    public class VetDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Specialization { get; set; } = string.Empty;
+    }
+}
+</file>
+
+<file path="Enums/AppointmentStatus.cs">
+namespace PetPulse.API.Enums
+{
+    public enum AppointmentStatus
+    {
+        Scheduled,
+        Confirmed,
+        Completed,
+        Cancelled,
+        NoShow
+    }
+}
+</file>
+
+<file path="MappingProfile.cs">
+using AutoMapper;
+using PetPulse.API.DTOs;
+using PetPulse.API.Models;
+namespace PetPulse.API
+{
+    public class MappingProfile : Profile
+    {
+        public MappingProfile()
+        {
+            // Owner Mapping
+            CreateMap<Owner, OwnerDto>();
+            CreateMap<CreateOwnerDto, Owner>();
+            // Pet Mapping
+            // Guid OwnerId -> string OwnerId is handled automatically by AutoMapper
+            CreateMap<Pet, PetDto>()
+                .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Owner.FirstName + " " + src.Owner.LastName));
+            CreateMap<CreatePetDto, Pet>();
+            // Vet Mapping
+            CreateMap<Vet, VetDto>()
+                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FirstName + " " + src.LastName));
+            CreateMap<VetDto, Vet>();
+            CreateMap<CreateVetDto, Vet>();
+            // Treatment Mapping
+            CreateMap<Treatment, TreatmentDto>();
+            CreateMap<CreateTreatmentDto, Treatment>();
+            // Appointment Mapping (Consolidated)
+            CreateMap<Appointment, AppointmentDto>()
+                .ForMember(dest => dest.PetName, opt => opt.MapFrom(src => src.Pet.Name))
+                .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Pet.Owner.FirstName + " " + src.Pet.Owner.LastName))
+                .ForMember(dest => dest.VetName, opt => opt.MapFrom(src => src.Vet.FirstName + " " + src.Vet.LastName))
+                // Extract Treatments from the Join Table
+                .ForMember(dest => dest.Treatments, opt => opt.MapFrom(src => src.AppointmentTreatments.Select(at => at.Treatment)));
+            CreateMap<CreateAppointmentDto, Appointment>();
+            // Review Mapping
+            CreateMap<Review, ReviewDto>()
+                .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Owner.FirstName + " " + src.Owner.LastName));
+            CreateMap<CreateReviewDto, Review>();
+        }
+    }
+}
+</file>
+
+<file path="Models/Appointment.cs">
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using PetPulse.API.Enums;
+namespace PetPulse.API.Models
+{
+    public class Appointment
+    {
+        [Key]
+        public Guid Id { get; set; }
+        [Required]
+        public DateTime Date { get; set; }
+        public string? Description { get; set; } // Reason for visit
+        public string? Diagnosis { get; set; } // Filled after the appointment
+        public AppointmentStatus Status { get; set; } = AppointmentStatus.Scheduled;
+        // Relations
+        public Guid PetId { get; set; }
+        public Pet Pet { get; set; } = null!;
+        public Guid VetId { get; set; }
+        public Vet Vet { get; set; } = null!;
+        public ICollection<AppointmentTreatment> AppointmentTreatments { get; set; } 
+            = new List<AppointmentTreatment>();
+    }
+}
+</file>
+
+<file path="Models/AppointmentTreatment.cs">
+namespace PetPulse.API.Models
+{
+    public class AppointmentTreatment
+    {
+        // Composite Primary Key (defined in DbContext later)
+        public Guid AppointmentId { get; set; }
+        public Appointment Appointment { get; set; } = null!;
+        public Guid TreatmentId { get; set; }
+        public Treatment Treatment { get; set; } = null!;
+    }
+}
+</file>
+
+<file path="Models/AppUser.cs">
+using Microsoft.AspNetCore.Identity;
+namespace PetPulse.API.Models
+{
+    // Extends the built-in IdentityUser to add custom fields if needed
+    public class AppUser : IdentityUser
+    {
+        // Example: You might want to store the Full Name directly on the user account
+        public string? FullName { get; set; }
+    }
+}
+</file>
+
+<file path="Models/Owner.cs">
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+namespace PetPulse.API.Models
+{
+    public class Owner
+    {
+        [Key]
+        public Guid Id { get; set; }
+        [Required]
+        public string FirstName { get; set; } = string.Empty;
+        [Required]
+        public string LastName { get; set; } = string.Empty;
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+        public string PhoneNumber { get; set; } = string.Empty;
+        // Navigation Property: One Owner has many Pets
+        public ICollection<Pet> Pets { get; set; } = new List<Pet>();
+        public ICollection<Review> Reviews { get; set; } = new List<Review>();
+        // Link to the Login User (Identity)
+        public string? AppUserId { get; set; }
+        [ForeignKey("AppUserId")]
+        public AppUser? AppUser { get; set; }
+    }
+}
+</file>
+
+<file path="Models/Pet.cs">
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+namespace PetPulse.API.Models
+{
+    public class Pet
+    {
+        [Key]
+        public Guid Id { get; set; }
+        [Required]
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public int Age { get; set; }
+        // Navigation Property: One Pet belongs to One Owner
+        public Guid OwnerId { get; set; }
+        [ForeignKey("OwnerId")]
+        public Owner Owner { get; set; } = null!;
+    }
+}
+</file>
+
+<file path="Models/Review.cs">
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+namespace PetPulse.API.Models
+{
+    public class Review
+    {
+        [Key]
+        public Guid Id { get; set; }
+        [Range(1, 5)] // Validation: 1 to 5 stars
+        public int Rating { get; set; }
+        [MaxLength(500)]
+        public string Comment { get; set; } = string.Empty;
+        public DateTime DatePosted { get; set; } = DateTime.UtcNow;
+        // Relations
+        public Guid VetId { get; set; }
+        public Vet Vet { get; set; } = null!;
+        public Guid OwnerId { get; set; }
+        public Owner Owner { get; set; } = null!;
+    }
+}
+</file>
+
+<file path="Models/Treatment.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.Models
+{
+    public class Treatment
+    {
+        [Key]
+        public Guid Id { get; set; }
+        [Required]
+        public string Name { get; set; } = string.Empty; // e.g. "Rabies Vaccine"
+        public decimal Cost { get; set; } // Money type
+        // Navigation
+        public ICollection<AppointmentTreatment> AppointmentTreatments { get; set; }
+            = new List<AppointmentTreatment>();
+    }
+}
+</file>
+
+<file path="Models/UserRoles.cs">
+namespace PetPulse.API.Models
+{
+    public static class UserRoles
+    {
+        public const string Admin = "Admin";
+        public const string User = "User";
+    }
+}
+</file>
+
+<file path="Models/Vet.cs">
+using System.ComponentModel.DataAnnotations;
+namespace PetPulse.API.Models
+{
+    public class Vet
+    {
+        [Key]
+        public Guid Id { get; set; }
+        [Required]
+        public string FirstName { get; set; } = string.Empty;
+        [Required]
+        public string LastName { get; set; } = string.Empty;
+        public int YearsOfExperience { get; set; }
+        // Navigation: One Vet has many appointments
+        public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+        public ICollection<Review> Reviews { get; set; } = new List<Review>();
+    }
+}
+</file>
+
+<file path="Program.cs">
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using PetPulse.API.Data;
+using PetPulse.API.Models;
+using System.Text;
+using System.Text.Json.Serialization;
+var builder = WebApplication.CreateBuilder(args);
+// ==============================
+// 1. Dependency Injection Setup (Like @ApplicationScoped)
+// ==============================
+// A. Connect to PostgreSQL
+// This reads "DefaultConnection" from appsettings.json
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
+// B. Setup Identity (Auth)
+// This wires up the "AppUser" and "IdentityRole" to the database
+builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
+{
+    // You can configure password rules here
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 6;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = false;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
+// 2. NEW: Add JWT Authentication
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.SaveToken = true;
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters()
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+    };
+});
+// Add CORS Policy
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:5173")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
+// C. Add Controllers (Like JAX-RS Resources)
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    });
+builder.Services.AddAutoMapper(typeof(Program));
+// D. Add Swagger (OpenAPI)
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "PetPulse API", Version = "v1" });
+    // 1. Define the Security Scheme (The "Lock" button)
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter your valid token in the text input below.\r\n\r\nExample: \"eyJhbGciOiJIUzI1NiIsInR5cCI...\""
+    });
+    // 2. Apply the Security to all endpoints
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
+var app = builder.Build();
+// ==============================
+// 2. HTTP Pipeline (Middleware)
+// ==============================
+// SEED DATA: Run this before the app starts handling requests
+// It creates a "Scope" to get access to the Database just for this moment
+//if (args.Length == 1 && args[0].ToLower() == "seeddata")
+//{
+//    // Optional: Only seed if run with specific command
+//    // But for portfolio, let's just run it every time in Development:
+//}
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    try
+    {
+        await DbInitializer.SeedAsync(app);
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.CreateScope().ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while seeding the database.");
+    }
+}
+//app.UseHttpsRedirection();
+app.UseCors("AllowReactApp");
+// These two must be in this exact order
+app.UseAuthentication(); // Who are you?
+app.UseAuthorization();  // Are you allowed here?
+app.MapControllers(); // Scans for [ApiController] classes
+app.Run();
+</file>
+
+</files>

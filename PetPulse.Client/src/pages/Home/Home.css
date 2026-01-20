@@ -1,0 +1,121 @@
+/* Home Page Styles */
+
+.home-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-xl);
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.home-hero {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  color: var(--background-white);
+  padding: var(--spacing-2xl);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+/* Stats Cards Animation */
+.stats-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stats-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Update Cards */
+.update-card {
+  border-left: 4px solid var(--primary-color);
+}
+
+.update-card:hover {
+  background-color: #fafafa;
+}
+
+/* Call to Action */
+.cta-section {
+  background: linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%);
+  margin-top: var(--spacing-2xl);
+}
+
+.home-hero h1 {
+  color: var(--background-white);
+  margin-bottom: var(--spacing-md);
+  font-size: 2.5rem;
+}
+
+.home-hero p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+  margin: var(--spacing-md) 0;
+}
+
+.home-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-xl);
+}
+
+.feature-card {
+  background: var(--background-white);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+  transition: all var(--transition-base);
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.feature-card h3 {
+  color: var(--primary-color);
+  margin: var(--spacing-md) 0;
+}
+
+.feature-card p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.home-cta {
+  text-align: center;
+  margin-top: var(--spacing-xl);
+}
+
+.home-cta button {
+  margin: 0 var(--spacing-md);
+}
+
+@media (max-width: 768px) {
+  .home-container {
+    padding: var(--spacing-md);
+  }
+
+  .home-hero {
+    padding: var(--spacing-lg);
+  }
+
+  .home-hero h1 {
+    font-size: 1.8rem;
+  }
+
+  .home-features {
+    grid-template-columns: 1fr;
+  }
+
+  .home-cta button {
+    display: block;
+    width: 100%;
+    margin: var(--spacing-sm) 0;
+  }
+}

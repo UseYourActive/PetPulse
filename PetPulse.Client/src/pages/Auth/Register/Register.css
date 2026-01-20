@@ -1,0 +1,137 @@
+/* Register Page Styles */
+
+.register-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+}
+
+.register-card {
+  background: var(--background-white);
+  padding: var(--spacing-2xl);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 500px;
+}
+
+.register-header {
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.register-header h1 {
+  color: var(--primary-color);
+  font-size: 2rem;
+  margin: var(--spacing-md) 0;
+}
+
+.register-header p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.register-form .form-group {
+  margin-bottom: 0;
+}
+
+.register-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+.register-form-row .form-group {
+  margin-bottom: 0;
+}
+
+.register-submit {
+  background-color: var(--primary-color);
+  color: var(--background-white);
+  padding: var(--spacing-md);
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border: none;
+  width: 100%;
+  margin-top: var(--spacing-md);
+}
+
+.register-submit:hover {
+  background-color: var(--primary-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.register-footer {
+  text-align: center;
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border-light);
+}
+
+.register-footer p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.register-footer a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.register-footer a:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.register-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  margin: var(--spacing-md) 0;
+  font-size: 0.9rem;
+}
+
+.register-terms input {
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.register-terms label {
+  cursor: pointer;
+  margin: 0;
+  font-weight: normal;
+}
+
+@media (max-width: 480px) {
+  .register-container {
+    min-height: auto;
+    padding: var(--spacing-md);
+  }
+
+  .register-card {
+    padding: var(--spacing-lg);
+  }
+
+  .register-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .register-form-row {
+    grid-template-columns: 1fr;
+  }
+}

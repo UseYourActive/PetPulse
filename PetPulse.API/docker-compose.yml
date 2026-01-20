@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  petpulse-api:
+    image: petpulse-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      # OVERRIDE the file setting to point to the db container
+      - ConnectionStrings__DefaultConnection=Host=petpulse-db;Port=5432;Database=petpulsedb;Username=postgres;Password=postgres
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+    depends_on:
+      - petpulse-db
+
+  petpulse-db:
+    image: postgres:latest
+    container_name: petpulse_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: petpulsedb
+    ports:
+      - "5432:5432"
+    volumes:
+      - petpulse_data:/var/lib/postgresql/data
+
+  db-admin:
+    image: adminer
+    restart: always
+    ports:
+      - "8082:8080" # Access at localhost:8082
+    depends_on:
+      - petpulse-db
+volumes:
+  petpulse_data:

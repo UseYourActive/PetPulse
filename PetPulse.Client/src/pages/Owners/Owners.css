@@ -1,0 +1,109 @@
+/* Owners Page Styles */
+
+.owners-container {
+  padding: var(--spacing-lg);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.owners-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xl);
+  gap: var(--spacing-lg);
+}
+
+.owners-header h1 {
+  color: var(--primary-color);
+  margin: 0;
+}
+
+.owners-actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.owners-filters {
+  background: var(--background-white);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.owners-filters .form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.owners-table-container {
+  background: var(--background-white);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.owners-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.owners-table thead {
+  background-color: var(--primary-color);
+  color: var(--background-white);
+}
+
+.owners-table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.owners-table td {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.owners-table tbody tr:hover {
+  background-color: rgba(47, 166, 160, 0.05);
+}
+
+.owner-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.owner-actions button {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 768px) {
+  .owners-container {
+    padding: var(--spacing-md);
+  }
+
+  .owners-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .owners-actions {
+    width: 100%;
+  }
+
+  .owners-actions button {
+    flex: 1;
+  }
+
+  .owners-table {
+    font-size: 0.9rem;
+  }
+
+  .owners-table th,
+  .owners-table td {
+    padding: var(--spacing-sm);
+  }
+}
