@@ -26,7 +26,13 @@ namespace PetPulse.API.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<VetDto>>> GetVets()
         {
-            var vets = await _context.Vets.ToListAsync();
+            _logger.LogInformation("Fetching all vets from database...");
+
+            var vets = await _context.Vets
+                .Include(v => v.Reviews)
+                .ToListAsync();
+
+            _logger.LogInformation("Successfully retrieved {Count} vets.", vets.Count);
             return Ok(_mapper.Map<List<VetDto>>(vets));
         }
 
@@ -35,8 +41,15 @@ namespace PetPulse.API.Controllers
         {
             if (!Guid.TryParse(id, out var vId)) return BadRequest("Invalid ID.");
 
-            var vet = await _context.Vets.FindAsync(vId);
-            if (vet == null) return NotFound();
+            var vet = await _context.Vets
+                .Include(v => v.Reviews)
+                .FirstOrDefaultAsync(v => v.Id == vId);
+
+            if (vet == null)
+            {
+                _logger.LogWarning("Vet with ID {Id} not found.", id);
+                return NotFound();
+            }
 
             return Ok(_mapper.Map<VetDto>(vet));
         }

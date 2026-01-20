@@ -18,11 +18,11 @@ namespace PetPulse.API
             CreateMap<CreatePetDto, Pet>();
 
             // Vet Mapping
-            CreateMap<Vet, VetDto>()
-                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FirstName + " " + src.LastName));
-
-            CreateMap<VetDto, Vet>();
             CreateMap<CreateVetDto, Vet>();
+            CreateMap<Vet, VetDto>()
+                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FirstName + " " + src.LastName))
+                .ForMember(dest => dest.AverageRating, opt => opt.MapFrom(src =>
+                        src.Reviews.Any() ? Math.Round(src.Reviews.Average(r => r.Rating), 1) : 0.0));
 
             // Treatment Mapping
             CreateMap<Treatment, TreatmentDto>();
