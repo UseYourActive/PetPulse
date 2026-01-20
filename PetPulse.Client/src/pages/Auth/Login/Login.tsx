@@ -18,6 +18,7 @@ import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useFetch } from '@/hooks/useFetch';
+import { getErrorMessage } from '@/utils/errorMessages';
 import './Login.css';
 
 interface LoginFormData {
@@ -143,11 +144,7 @@ const Login = () => {
   // Handle login errors
   useEffect(() => {
     if (error && submitTrigger) {
-      const errorData = error.response?.data as { message?: string } | undefined;
-      const errorMessage =
-        errorData?.message ||
-        error.message ||
-        'Login failed. Please check your credentials.';
+      const errorMessage = getErrorMessage(error, 'login');
       setApiError(errorMessage);
       setSubmitTrigger(null);
     }

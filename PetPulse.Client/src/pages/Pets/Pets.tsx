@@ -10,12 +10,14 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PetsIcon from '@mui/icons-material/Pets';
-import { useAuth } from '../../context/AuthContext';
-import { petsApi } from '../../utils/petsApi';
-import type { Pet } from '../../utils/petsApi';
+import { useAuth } from '@/context/AuthContext';
+import { petsApi } from '@/utils/petsApi';
+import type { Pet } from '@/utils/petsApi';
 import { PetCard, PetForm } from './components';
-import { FormModal } from '../../components/Modal';
-import { ConfirmModal } from '../../components/Modal';
+import { FormModal } from '@/components/Modal';
+import { ConfirmModal } from '@/components/Modal';
+import { decodeJWT } from '@/utils/jwt';
+import { getErrorMessage } from '@/utils/errorMessages';
 import './Pets.css';
 
 const Pets = () => {
@@ -51,28 +53,22 @@ const Pets = () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('Loading pets for user:', user.username);
       const data = await petsApi.getPets();
-      console.log('API response:', data);
       // Backend should filter by token, but we'll use all returned pets
       const userPets = Array.isArray(data) ? data : [];
-      console.log('Filtered pets:', userPets);
       setPets(userPets);
       setError(null); // Clear any previous errors on success
     } catch (err: any) {
       
       // If it's a 404, treat as no pets found
       if (err.response?.status === 404) {
-        console.log('404 - No pets found, setting empty array');
         setPets([]);
         setError(null);
       } else {
-        const errorMessage = err.response?.data?.message || err.message || 'Failed to load pets. Please try again.';
-        console.error('Setting error message:', errorMessage);
+        const errorMessage = getErrorMessage(err, 'pets', 'load');
         setError(errorMessage);
       }
     } finally {
-      console.log('Setting loading to false');
       setLoading(false);
     }
   };
@@ -92,16 +88,6 @@ const Pets = () => {
     setIsAddModalOpen(true);
   };
 
-  const handleEditClick = (pet: Pet) => {
-    setFormPet({ ...pet });
-    setSelectedPet(pet);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDeleteClick = (pet: Pet) => {
-    setSelectedPet(pet);
-    setIsDeleteModalOpen(true);
-  };
 
   const handleFormChange = (field: keyof Pet, value: any) => {
     setFormPet((prev) => ({ ...prev, [field]: value }));
@@ -119,7 +105,6 @@ const Pets = () => {
         age: formPet.age || 0,
         ownerId: userId,
       };
-      debugger;
       const newPet = await petsApi.createPet(petData);
 
       setPets([...pets, newPet]);
@@ -127,7 +112,8 @@ const Pets = () => {
       setSuccessMessage(`${newPet.name} has been added successfully!`);
       setFormPet({});
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to add pet. Please try again.');
+      const errorMessage = getErrorMessage(err, 'pets', 'create');
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -138,14 +124,28 @@ const Pets = () => {
 
     setIsSubmitting(true);
     try {
-      const updatedPet = await petsApi.updatePet(selectedPet.id, formPet);
+      await petsApi.updatePet(selectedPet.id, formPet);
+      // Since backend returns NoContent, construct updated pet from form data
+      const updatedPet: Pet = {
+        ...selectedPet,
+        ...formPet,
+        id: selectedPet.id, // Ensure ID is preserved
+        ownerName: selectedPet.ownerName, // Preserve ownerName
+      };
       setPets(pets.map((p) => (p.id === selectedPet.id ? updatedPet : p)));
       setIsEditModalOpen(false);
       setSelectedPet(null);
       setSuccessMessage(`${updatedPet.name} has been updated successfully!`);
       setFormPet({});
+      
+      // Decode JWT token
+      const token = localStorage.getItem('token');
+      if (token) {
+        decodeJWT(token);
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update pet. Please try again.');
+      const errorMessage = getErrorMessage(err, 'pets', 'update');
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -162,7 +162,8 @@ const Pets = () => {
       setSelectedPet(null);
       setSuccessMessage(`${selectedPet.name} has been removed successfully.`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete pet. Please try again.');
+      const errorMessage = getErrorMessage(err, 'pets', 'delete');
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -215,10 +216,10 @@ const Pets = () => {
       ) : pets.length === 0 ? (
         <Box className="pets-empty-state">
           <PetsIcon className="pets-empty-icon" />
-          <Typography variant="h6" color="textSecondary" className="mb-1">
+          <Typography variant="h6" color="textSecondary" sx={{ mb: 2, mt: 2 }}>
             No pets yet
           </Typography>
-          <Typography variant="body2" color="textSecondary" className="mb-3">
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 4 }}>
             Start by adding your first pet companion!
           </Typography>
           <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddClick}>
@@ -231,8 +232,6 @@ const Pets = () => {
             <PetCard
               key={pet.id || Math.random()}
               pet={pet}
-              onEdit={handleEditClick}
-              onDelete={handleDeleteClick}
             />
           ))}
         </Box>
@@ -247,7 +246,9 @@ const Pets = () => {
         submitText="Add Pet"
         loading={isSubmitting}
       >
-        <PetForm pet={formPet} onChange={handleFormChange} />
+        <Box sx={{ mt: 2 }}>
+          <PetForm pet={formPet} onChange={handleFormChange} />
+        </Box>
       </FormModal>
 
       {/* Edit Pet Modal */}
@@ -263,7 +264,9 @@ const Pets = () => {
         submitText="Save Changes"
         loading={isSubmitting}
       >
-        <PetForm pet={formPet} onChange={handleFormChange} />
+        <Box sx={{ mt: 2 }}>
+          <PetForm pet={formPet} onChange={handleFormChange} />
+        </Box>
       </FormModal>
 
       {/* Delete Confirmation Modal */}

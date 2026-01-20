@@ -1,17 +1,19 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { AuthProvider } from './context/AuthContext';
-import { theme } from './theme/theme';
-import './styles/main.css';
-import MainLayout from './layout/MainLayout/MainLayout';
-import Home from './pages/Home/Home';
-import Owners from './pages/Owners/Owners';
-import Pets from './pages/Pets/Pets';
-import Vets from './pages/Vets/Vets';
-import Appointments from './pages/Appointments/Appointments';
-import Login from './pages/Auth/Login/Login';
-import Register from './pages/Auth/Register/Register';
+import { AuthProvider } from '@/context/AuthContext';
+import { theme } from '@/theme/theme';
+import '@/styles/main.css';
+import MainLayout from '@/layout/MainLayout/MainLayout';
+import Home from '@/pages/Home/Home';
+import Owners from '@/pages/Owners/Owners';
+import Pets from '@/pages/Pets/Pets';
+import PetDetails from '@/pages/Pets/PetDetails';
+import Vets from '@/pages/Vets/Vets';
+import VetDetails from '@/pages/Vets/VetDetails';
+import Appointments from '@/pages/Appointments/Appointments';
+import Login from '@/pages/Auth/Login/Login';
+import Register from '@/pages/Auth/Register/Register';
 
 
 function App() {
@@ -30,7 +32,9 @@ function App() {
               </Route>
               <Route path="owners" element={<Owners />} />
               <Route path="pets" element={<Pets />} />
+              <Route path="pets/:id" element={<PetDetails />} />
               <Route path="vets" element={<Vets />} />
+              <Route path="vets/:id" element={<VetDetails />} />
               <Route path="appointments" element={<Appointments />} />
             </Route>
           </Routes>

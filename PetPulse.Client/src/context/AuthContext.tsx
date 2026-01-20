@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
+import { extractUserFromToken, isTokenExpired } from '@/utils/jwt';
 
 export interface User {
   id: string;
@@ -52,23 +53,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Load user from localStorage on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
     
-    if (storedUser && storedToken) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser({
-          id: parsedUser.id,
-          username: parsedUser.username,
-          email: parsedUser.email,
-          role: parsedUser.role,
-          token: storedToken,
-        });
+    if (storedToken) {
+      // Check if token is expired
+      if (isTokenExpired(storedToken)) {
+        console.warn('Token expired, clearing storage');
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        setLoading(false);
+        return;
+      }
+
+      // Decode token to extract user info
+      const tokenData = extractUserFromToken(storedToken);
+      if (tokenData) {
+        // Try to get additional info from stored user (like email, id)
+        let userData: User;
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            userData = {
+              id: parsedUser.id || '',
+              username: tokenData.username,
+              email: parsedUser.email || '',
+              role: tokenData.role,
+              token: storedToken,
+            };
+          } catch {
+            // Fallback if stored user is invalid
+            userData = {
+              id: '',
+              username: tokenData.username,
+              email: '',
+              role: tokenData.role,
+              token: storedToken,
+            };
+          }
+        } else {
+          userData = {
+            id: '',
+            username: tokenData.username,
+            email: '',
+            role: tokenData.role,
+            token: storedToken,
+          };
+        }
+        
+        setUser(userData);
         // Set token in axios headers
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-      } catch (error) {
-        console.error('Failed to parse stored user:', error);
+      } else {
+        // Invalid token, clear storage
         localStorage.removeItem('user');
         localStorage.removeItem('token');
       }
@@ -82,11 +119,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const loginRequest: LoginRequest = { username, password };
       const response = await apiClient.post<AuthResponse>('/api/Auth/login', loginRequest);
       
+      // Decode token to verify and extract user info
+      const tokenData = extractUserFromToken(response.data.token);
+      if (!tokenData) {
+        throw new Error('Invalid token received from server');
+      }
+
       const userData: User = {
         id: response.data.ownerId,
-        username: response.data.username,
+        username: tokenData.username || response.data.username,
         email: response.data.email,
-        role: response.data.role,
+        role: tokenData.role || response.data.role,
         token: response.data.token,
       };
 
@@ -126,11 +169,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const response = await apiClient.post<AuthResponse>('/api/Auth/register', registerRequest);
       
+      // Decode token to verify and extract user info
+      const tokenData = extractUserFromToken(response.data.token);
+      if (!tokenData) {
+        throw new Error('Invalid token received from server');
+      }
+
       const userData: User = {
         id: response.data.ownerId,
-        username: response.data.username,
+        username: tokenData.username || response.data.username,
         email: response.data.email,
-        role: response.data.role,
+        role: tokenData.role || response.data.role,
         token: response.data.token,
       };
       setUser(userData);

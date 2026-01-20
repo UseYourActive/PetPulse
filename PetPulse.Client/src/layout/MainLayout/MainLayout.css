@@ -12,8 +12,28 @@
 /* ======== HEADER STYLES ======== */
 
 .header {
-  background-color: #2FA6A0;
-  box-shadow: 0 2px 8px rgba(47, 166, 160, 0.15);
+  background: linear-gradient(135deg, #2FA6A0 0%, #3DB8B2 50%, #1F8A85 100%);
+  box-shadow: 0 4px 20px rgba(47, 166, 160, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.header > * {
+  position: relative;
+  z-index: 1;
 }
 
 .header__logo {
@@ -26,8 +46,7 @@
 }
 
 .header__logo:hover {
-  transform: scale(1.02);
-  color: rgba(255, 255, 255, 0.9);
+  opacity: 0.9;
 }
 
 .header__toolbar {

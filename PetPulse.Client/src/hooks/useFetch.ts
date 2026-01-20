@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import axios, { AxiosError } from 'axios';
 import type { AxiosRequestConfig } from 'axios';
 
@@ -43,11 +43,14 @@ export const useFetch = <T = unknown,>(
     error: null,
   });
 
-  const { skip = false, ...axiosConfig } = options || {};
+  const { skip = false, ...axiosConfigOptions } = options || {};
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   const fetchData = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
+      const { skip: _, ...axiosConfig } = optionsRef.current || {};
       const response = await axios<T>(url, {
         ...axiosConfig,
       });
@@ -64,7 +67,7 @@ export const useFetch = <T = unknown,>(
         error,
       });
     }
-  }, [url, axiosConfig]);
+  }, [url]);
 
   useEffect(() => {
     if (!skip) {

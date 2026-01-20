@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '@/utils/errorMessages';
 import './Register.css';
 
 interface RegisterFormData {
@@ -123,7 +124,10 @@ const Register = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Registration failed');
+        const statusCode = response.status.toString();
+        const error = new Error(errorData.message || 'Registration failed');
+        (error as any).response = { status: statusCode, data: errorData };
+        throw error;
       }
 
       await response.json();
@@ -144,7 +148,8 @@ const Register = () => {
         navigate('/auth/login');
       }, 2000);
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : 'Registration failed. Please try again.');
+      const errorMessage = getErrorMessage(error, 'register');
+      setApiError(errorMessage);
     } finally {
       setLoading(false);
     }

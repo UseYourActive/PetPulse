@@ -1,22 +1,42 @@
 /* Main CSS - All Styles Consolidated */
 
 /* ===== 1. Variables and Design Tokens ===== */
-/* Color Variables - Teal Theme */
+/* Color Variables - Teal Theme with Gradients */
 :root {
   --primary-color: #2FA6A0;
   --primary-light: #52B7B1;
   --primary-dark: #247973;
+  --gradient-start: #2FA6A0;
+  --gradient-mid: #3DB8B2;
+  --gradient-end: #1F8A85;
+  --gradient-accent-start: #4ECDC4;
+  --gradient-accent-end: #2FA6A0;
+  
   --secondary-color: #1F4E79;
   --secondary-light: #4A7DB3;
   --secondary-dark: #153955;
+  --secondary-gradient-start: #1F4E79;
+  --secondary-gradient-end: #2E5C8A;
   
   /* Neutral Colors */
   --background-light: #f5f5f5;
+  --background-gradient: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #f5f5f5 100%);
   --background-white: #ffffff;
   --text-primary: #333333;
   --text-secondary: #666666;
   --border-color: #e0e0e0;
   --border-light: #f0f0f0;
+  
+  /* Gradient Definitions */
+  --gradient-primary: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-mid) 50%, var(--gradient-end) 100%);
+  --gradient-primary-reverse: linear-gradient(135deg, var(--gradient-end) 0%, var(--gradient-mid) 50%, var(--gradient-start) 100%);
+  --gradient-accent: linear-gradient(135deg, var(--gradient-accent-start) 0%, var(--gradient-accent-end) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--secondary-gradient-start) 0%, var(--secondary-gradient-end) 100%);
+  --gradient-card: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  --gradient-stats-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-stats-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --gradient-stats-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --gradient-stats-4: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
   
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -92,22 +112,146 @@ body {
 main {
   flex: 1;
   width: 100%;
-  background-color: var(--background-light);
+  background: var(--background-gradient);
   padding: var(--spacing-xl) 0;
+  position: relative;
+}
+
+main::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(47, 166, 160, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(31, 78, 121, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+main > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Card Styles */
 .card {
-  background-color: var(--background-white);
+  background: var(--gradient-card);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   padding: var(--spacing-lg);
-  transition: all var(--transition-base);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s ease;
+}
+
+.card:hover::before {
+  transform: scaleX(1);
 }
 
 .card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(47, 166, 160, 0.25);
+  transform: translateY(-4px) scale(1.01);
+}
+
+/* Card Hover Overlay */
+.card-with-hover-overlay {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-hover-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(47, 166, 160, 0.75) 0%, rgba(61, 184, 178, 0.75) 50%, rgba(31, 138, 133, 0.75) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 5;
+  border-radius: inherit;
+  backdrop-filter: blur(2px);
+}
+
+.card-with-hover-overlay:hover .card-hover-overlay {
+  opacity: 1;
+  visibility: visible;
+}
+
+.card-hover-overlay-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  transform: scale(0.8);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+  width: 100%;
+  height: 100%;
+}
+
+.card-with-hover-overlay:hover .card-hover-overlay-content {
+  transform: scale(1);
+}
+
+.card-overlay-button {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(10px);
+  width: 64px !important;
+  height: 64px !important;
+  border: 2px solid rgba(47, 166, 160, 0.3) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  color: #2FA6A0 !important;
+}
+
+.card-overlay-button-edit {
+  color: #2FA6A0 !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(47, 166, 160, 0.4) !important;
+}
+
+.card-overlay-button-edit:hover {
+  background: rgba(240, 255, 253, 0.95) !important;
+  border-color: rgba(47, 166, 160, 0.6) !important;
+  transform: scale(1.1) rotate(-5deg);
+  box-shadow: 0 6px 20px rgba(47, 166, 160, 0.3) !important;
+}
+
+.card-overlay-button-delete {
+  color: #2FA6A0 !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(47, 166, 160, 0.4) !important;
+}
+
+.card-overlay-button-delete:hover {
+  background: rgba(240, 255, 253, 0.95) !important;
+  border-color: rgba(47, 166, 160, 0.6) !important;
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 6px 20px rgba(47, 166, 160, 0.3) !important;
+}
+
+.card-overlay-button svg {
+  font-size: 32px !important;
 }
 
 .card-header {
@@ -230,7 +374,10 @@ body {
 h1 {
   font-size: 2.5rem;
   font-weight: 700;
-  color: var(--primary-color);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: var(--spacing-lg) 0;
   letter-spacing: -0.5px;
 }
@@ -238,14 +385,20 @@ h1 {
 h2 {
   font-size: 2rem;
   font-weight: 700;
-  color: var(--primary-color);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: var(--spacing-lg) 0 var(--spacing-md) 0;
 }
 
 h3 {
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--primary-color);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: var(--spacing-md) 0;
 }
 
@@ -325,18 +478,19 @@ button {
 
 /* Primary Button */
 .btn-primary {
-  background-color: var(--primary-color);
+  background: var(--gradient-primary);
   color: var(--background-white);
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-md);
   font-size: 1rem;
   font-weight: 600;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 15px rgba(47, 166, 160, 0.4);
+  transition: all 0.3s ease;
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-dark);
-  box-shadow: var(--shadow-md);
+  background: var(--gradient-primary-reverse);
+  box-shadow: 0 6px 20px rgba(47, 166, 160, 0.5);
   transform: translateY(-2px);
 }
 
@@ -455,6 +609,18 @@ select {
   background-color: var(--background-white);
   color: var(--text-primary);
   transition: all var(--transition-base);
+}
+
+/* Date Input Calendar Icon - Global Styling */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(47%) sepia(89%) saturate(1200%) hue-rotate(150deg) brightness(95%) contrast(85%);
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 input:focus,
@@ -1054,13 +1220,45 @@ img {
 
 .stats-card {
   text-align: center;
-  padding: var(--spacing-md);
-  box-shadow: var(--shadow-md);
+  padding: var(--spacing-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-lg);
+  background: var(--gradient-card);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.stats-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s ease;
+}
+
+.stats-card:hover::before {
+  transform: scaleX(1);
+}
+
+.stats-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(47, 166, 160, 0.25);
+}
+
+
 .stats-icon {
-  color: var(--primary-color);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: var(--spacing-sm);
+  filter: drop-shadow(0 2px 4px rgba(47, 166, 160, 0.2));
 }
 
 /* Updates Grid */
@@ -1094,9 +1292,34 @@ img {
 /* Call to Action */
 .cta-section {
   text-align: center;
-  padding: var(--spacing-lg) 0;
-  background-color: var(--background-light);
-  border-radius: var(--radius-md);
+  padding: var(--spacing-2xl) var(--spacing-xl);
+  background: linear-gradient(135deg, rgba(47, 166, 160, 0.08) 0%, rgba(61, 184, 178, 0.12) 50%, rgba(31, 138, 133, 0.08) 100%);
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(47, 166, 160, 0.15);
+}
+
+.cta-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(47, 166, 160, 0.1) 0%, transparent 70%);
+  animation: pulse-gradient 8s ease-in-out infinite;
+}
+
+@keyframes pulse-gradient {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }
 
 .cta-buttons {
@@ -1109,11 +1332,16 @@ img {
 /* Page Header */
 .page-header {
   margin-bottom: calc(var(--spacing-lg) + var(--spacing-md));
+  text-align: center;
 }
 
 .page-header-title {
   font-weight: 700;
   margin-bottom: var(--spacing-xs);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* Pets Page */

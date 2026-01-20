@@ -1,6 +1,7 @@
-import { AppBar, Toolbar, Typography } from '@mui/material';
+import { AppBar, Toolbar, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import Navigation from './Navigation';
+import logoImage from '@/assets/image.png';
 
 const Header = () => {
   const navigate = useNavigate();
@@ -8,13 +9,27 @@ const Header = () => {
   return (
     <AppBar position="static" className="header">
       <Toolbar className="header__toolbar">
-        <Typography
-          variant="h6"
+        <Box
           className="header__logo"
           onClick={() => navigate('/')}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            py: 0.5,
+          }}
         >
-          🐾 PetPulse
-        </Typography>
+          <img 
+            src={logoImage} 
+            alt="PetPulse" 
+            style={{
+              height: '60px',
+              width: 'auto',
+              objectFit: 'contain',
+              maxWidth: '200px',
+            }}
+          />
+        </Box>
 
         <Navigation />
       </Toolbar>

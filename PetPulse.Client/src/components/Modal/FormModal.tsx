@@ -37,12 +37,51 @@ export const FormModal = React.forwardRef<HTMLDivElement, FormModalProps>(
     },
     ref
   ) => {
+    const handleClose = (_event: {}, reason?: string) => {
+      // Only allow closing via Cancel button or ESC key, not by clicking backdrop
+      // In MUI, reason can be 'backdropClick' or 'escapeKeyDown'
+      if (reason === 'backdropClick') {
+        return; // Prevent closing on backdrop click
+      }
+      // Allow closing for other reasons (ESC key, button clicks)
+      onClose();
+    };
+
     return (
-      <Dialog ref={ref} open={open} onClose={onClose} {...props}>
-        <DialogTitle>{title}</DialogTitle>
-        <DialogContent sx={{ minWidth: 400 }}>{children}</DialogContent>
-        <DialogActions>
-          <Button onClick={onClose} disabled={loading}>
+      <Dialog 
+        ref={ref} 
+        open={open} 
+        {...props}
+        onClose={handleClose}
+      >
+        <DialogTitle sx={{ px: 4, pt: 3, pb: 2 }}>{title}</DialogTitle>
+        <DialogContent
+          sx={{
+            minWidth: 420,
+            px: 4,
+            pt: 3,
+            pb: 3,
+          }}
+        >
+          {children}
+        </DialogContent>
+        <DialogActions sx={{ px: 4, pb: 3, justifyContent: 'space-between' }}>
+          <Button 
+            onClick={onClose} 
+            disabled={loading}
+            variant="outlined"
+            sx={{
+              minWidth: 100,
+              borderColor: '#e0e0e0',
+              color: '#666666',
+              '&:hover': {
+                backgroundColor: '#f5f5f5',
+                borderColor: '#2FA6A0',
+                color: '#2FA6A0',
+                borderWidth: '2px',
+              },
+            }}
+          >
             {cancelText}
           </Button>
           <Button

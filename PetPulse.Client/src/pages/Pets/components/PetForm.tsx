@@ -4,8 +4,8 @@ import {
   MenuItem,
   Box,
 } from '@mui/material';
-import type { Pet } from '../../../utils/petsApi';
-import '../../../styles/main.css';
+import type { Pet } from '@/utils/petsApi';
+import '@/styles/main.css';
 
 interface PetFormProps {
 pet: Partial<Pet>;
@@ -14,7 +14,7 @@ onChange: (field: keyof Pet, value: any) => void;
 
 const PetForm: React.FC<PetFormProps> = ({ pet, onChange }) => {
   return (
-    <Box className="pt-1 display-flex flex-column gap-2">
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <TextField
         fullWidth
         label="Pet Name"

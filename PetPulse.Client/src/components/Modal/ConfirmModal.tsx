@@ -39,8 +39,23 @@ export const ConfirmModal = React.forwardRef<HTMLDivElement, ConfirmModalProps>(
     },
     ref
   ) => {
+    const handleClose = (_event: {}, reason?: string) => {
+      // Only allow closing via Cancel button or ESC key, not by clicking backdrop
+      // In MUI, reason can be 'backdropClick' or 'escapeKeyDown'
+      if (reason === 'backdropClick') {
+        return; // Prevent closing on backdrop click
+      }
+      // Allow closing for other reasons (ESC key, button clicks)
+      onCancel();
+    };
+
     return (
-      <Dialog ref={ref} open={open} onClose={onCancel} {...props}>
+      <Dialog 
+        ref={ref} 
+        open={open} 
+        {...props}
+        onClose={handleClose}
+      >
         <DialogTitle>{title}</DialogTitle>
         <DialogContent>{message}</DialogContent>
         <DialogActions>

@@ -1,33 +1,74 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   CardContent,
-  CardActions,
   Typography,
   Box,
-  IconButton,
   Avatar,
 } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import PetsIcon from '@mui/icons-material/Pets';
-import type { Pet } from '../../../utils/petsApi';
+import type { Pet } from '@/utils/petsApi';
+
+const getPetIcon = (petType: string) => {
+  const type = petType?.toLowerCase() || 'other';
+  switch (type) {
+    case 'dog':
+      return '🐕';
+    case 'cat':
+      return '🐱';
+    case 'bird':
+      return '🐦';
+    case 'rabbit':
+      return '🐰';
+    case 'hamster':
+      return '🐹';
+    default:
+      return '🐾';
+  }
+};
+
+const getPetIconColor = (petType: string) => {
+  const type = petType?.toLowerCase() || 'other';
+  switch (type) {
+    case 'dog':
+      return '#8B4513'; // Brown
+    case 'cat':
+      return '#FF6B6B'; // Coral
+    case 'bird':
+      return '#4ECDC4'; // Teal
+    case 'rabbit':
+      return '#FFE66D'; // Yellow
+    case 'hamster':
+      return '#FFA07A'; // Light Salmon
+    default:
+      return 'primary.main';
+  }
+};
 
 interface PetCardProps {
   pet: Pet;
-  onEdit: (pet: Pet) => void;
-  onDelete: (pet: Pet) => void;
 }
 
-const PetCard: React.FC<PetCardProps> = ({ pet, onEdit, onDelete }) => {
+const PetCard: React.FC<PetCardProps> = ({ pet }) => {
+  const navigate = useNavigate();
+
+  const handleCardClick = () => {
+    navigate(`/pets/${pet.id}`);
+  };
+
   return (
     <Card
+      className="card-with-hover-overlay"
+      onClick={handleCardClick}
       sx={{
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        position: 'relative',
+        overflow: 'hidden',
         boxShadow: 2,
         transition: 'all 0.3s ease',
+        cursor: 'pointer',
         '&:hover': {
           boxShadow: 4,
           transform: 'translateY(-4px)',
@@ -38,13 +79,14 @@ const PetCard: React.FC<PetCardProps> = ({ pet, onEdit, onDelete }) => {
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Avatar
             sx={{
-              bgcolor: 'primary.main',
-              width: 56,
-              height: 56,
+              bgcolor: getPetIconColor(pet.type),
+              width: 72,
+              height: 72,
               mr: 2,
+              fontSize: 48,
             }}
           >
-            <PetsIcon sx={{ fontSize: 32 }} />
+            {getPetIcon(pet.type)}
           </Avatar>
           <Box sx={{ flexGrow: 1 }}>
             <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>
@@ -67,28 +109,9 @@ const PetCard: React.FC<PetCardProps> = ({ pet, onEdit, onDelete }) => {
           )}
         </Box>
       </CardContent>
-  
-        <CardActions sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}>
-          <IconButton
-            color="primary"
-            onClick={() => onEdit(pet)}
-            aria-label="edit pet"
-            size="small"
-          >
-            <EditIcon />
-          </IconButton>
-          <IconButton
-            color="error"
-            onClick={() => onDelete(pet)}
-            aria-label="delete pet"
-            size="small"
-          >
-            <DeleteIcon />
-          </IconButton>
-        </CardActions>
-      </Card>
-    );
-  };
+    </Card>
+  );
+};
   
   export default PetCard;
   
