@@ -25,7 +25,7 @@ namespace PetPulse.API.Controllers
 
         // GET: api/owners
         [HttpGet]
-        [Authorize(Roles = "Admin")] // Only Admin should see a list of ALL users
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<IEnumerable<OwnerDto>>> GetOwners()
         {
             _logger.LogInformation("Fetching all owners from database...");
@@ -35,7 +35,7 @@ namespace PetPulse.API.Controllers
 
         // GET: api/owners/{guid}
         [HttpGet("{id}")]
-        [Authorize] // Any logged in user
+        [Authorize]
         public async Task<ActionResult<OwnerDto>> GetOwner(string id)
         {
             if (!Guid.TryParse(id, out var ownerId)) return BadRequest("Invalid ID format.");
@@ -56,7 +56,6 @@ namespace PetPulse.API.Controllers
         public async Task<ActionResult<OwnerDto>> CreateOwner(CreateOwnerDto createOwnerDto)
         {
             var owner = _mapper.Map<Owner>(createOwnerDto);
-            // Since we use Guids, EF Core usually generates them, but we can be explicit:
             owner.Id = Guid.NewGuid();
 
             _context.Owners.Add(owner);
@@ -93,7 +92,7 @@ namespace PetPulse.API.Controllers
 
         // DELETE: api/owners/{guid}
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")] // Critical: Only Admin should delete users this way
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteOwner(string id)
         {
             if (!Guid.TryParse(id, out var ownerId)) return BadRequest("Invalid ID format.");

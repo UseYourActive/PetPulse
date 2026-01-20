@@ -5,26 +5,20 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using PetPulse.API.Data;
 using PetPulse.API.Models;
+using PetPulse.API.Services;
 using System.Text;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ==============================
-// 1. Dependency Injection Setup (Like @ApplicationScoped)
-// ==============================
-
 // A. Connect to PostgreSQL
-// This reads "DefaultConnection" from appsettings.json
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 // B. Setup Identity (Auth)
-// This wires up the "AppUser" and "IdentityRole" to the database
 builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
 {
-    // You can configure password rules here
     options.Password.RequireDigit = true;
     options.Password.RequiredLength = 6;
     options.Password.RequireNonAlphanumeric = false;
@@ -33,7 +27,7 @@ builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// 2. NEW: Add JWT Authentication
+// JWT Authentication
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -56,7 +50,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Add CORS Policy
+// CORS Policy
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
@@ -68,7 +62,7 @@ builder.Services.AddCors(options =>
         });
 });
 
-// C. Add Controllers (Like JAX-RS Resources)
+// C. Add Controllers
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -76,13 +70,21 @@ builder.Services.AddControllers()
     });
 builder.Services.AddAutoMapper(typeof(Program));
 
+var notificationServiceUrl = builder.Configuration["NotificationService:Url"] ?? "http://localhost:8080";
+
+builder.Services.AddHttpClient<INotificationService, PetPulse.API.Services.NotificationService>(client =>
+{
+    client.BaseAddress = new Uri(notificationServiceUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
 // D. Add Swagger (OpenAPI)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "PetPulse API", Version = "v1" });
 
-    // 1. Define the Security Scheme (The "Lock" button)
+    // 1. Define the Security Scheme
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -112,19 +114,7 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// ==============================
-// 2. HTTP Pipeline (Middleware)
-// ==============================
 
-// SEED DATA: Run this before the app starts handling requests
-// It creates a "Scope" to get access to the Database just for this moment
-//if (args.Length == 1 && args[0].ToLower() == "seeddata")
-//{
-//    // Optional: Only seed if run with specific command
-//    // But for portfolio, let's just run it every time in Development:
-//}
-
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -143,10 +133,10 @@ if (app.Environment.IsDevelopment())
 
 //app.UseHttpsRedirection();
 app.UseCors("AllowReactApp");
-// These two must be in this exact order
-app.UseAuthentication(); // Who are you?
-app.UseAuthorization();  // Are you allowed here?
 
-app.MapControllers(); // Scans for [ApiController] classes
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
 
 app.Run();

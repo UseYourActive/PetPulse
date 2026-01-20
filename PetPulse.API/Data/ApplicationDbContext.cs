@@ -4,7 +4,6 @@ using PetPulse.API.Models;
 
 namespace PetPulse.API.Data
 {
-    // Inheriting from IdentityDbContext gives us all the User/Role tables automatically
     public class ApplicationDbContext : IdentityDbContext<AppUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
@@ -12,7 +11,6 @@ namespace PetPulse.API.Data
         {
         }
 
-        // Define your custom tables here
         public DbSet<Owner> Owners { get; set; }
         public DbSet<Pet> Pets { get; set; }
         public DbSet<Vet> Vets { get; set; }
@@ -24,7 +22,7 @@ namespace PetPulse.API.Data
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
-            base.OnModelCreating(builder); // CRITICAL: Required for Identity to work
+            base.OnModelCreating(builder);
 
             // Configure the One-to-Many relationship explicitly (optional but good practice)
             builder.Entity<Owner>()

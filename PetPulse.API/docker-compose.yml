@@ -7,14 +7,16 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "5000:8080" # Host 5000 -> Container 8080
     environment:
-      # OVERRIDE the file setting to point to the db container
       - ConnectionStrings__DefaultConnection=Host=petpulse-db;Port=5432;Database=petpulsedb;Username=postgres;Password=postgres
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
+      # Points to the Java service below
+      - NotificationService__Url=http://notification-service:8080
     depends_on:
       - petpulse-db
+      - notification-service
 
   petpulse-db:
     image: postgres:latest
@@ -24,7 +26,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: petpulsedb
     ports:
-      - "5432:5432"
+      - "5433:5432" # Host 5433 -> Container 5432 (PetPulse DB)
     volumes:
       - petpulse_data:/var/lib/postgresql/data
 
@@ -32,8 +34,71 @@ services:
     image: adminer
     restart: always
     ports:
-      - "8082:8080" # Access at localhost:8082
+      - "8082:8080"
     depends_on:
       - petpulse-db
+
+  # Redis (Required by Notification Service)
+  redis-notification-service:
+    image: redis:7-alpine
+    container_name: redis-notification-service
+    ports:
+      - "6379:6379"
+
+  # Postgres (Required by Notification Service)
+  postgres-notification:
+    image: postgres:16
+    container_name: postgres-notification
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notificationdb
+    ports:
+      - "5434:5432" # Host 5434 -> Container 5432 (Notification DB)
+
+  notification-service:
+    image: quarkus/notification-service-jvm:latest
+    container_name: notification-service
+    ports:
+      - "8085:8080" # Host 8085 -> Container 8080
+    depends_on:
+      - redis-notification-service
+      - postgres-notification
+    environment:
+      # --- DATABASE ---
+      - DB_HOST=postgres-notification 
+      - QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://postgres-notification:5432/notificationdb
+      - QUARKUS_DATASOURCE_USERNAME=postgres
+      - QUARKUS_DATASOURCE_PASSWORD=postgres
+      - QUARKUS_DATASOURCE_DB=notificationdb
+      - DB_GENERATION=drop-and-create # Reset DB on startup to avoid conflicts
+      
+      # --- REDIS ---
+      - REDIS_HOST=redis://redis-notification-service:6379
+      
+      # --- TELEGRAM (REAL) ---
+      - TELEGRAM_ENABLED=true
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_BOT_NAME=My Notification Bot
+      - TELEGRAM_BOT_USERNAME=AlexQuarkusBot
+      
+      # SendGrid
+      - EMAIL_PROVIDER=sendgrid
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - MAILER_HOST=smtp.sendgrid.net
+      - SENDGRID_FROM_EMAIL=dummy@example.com
+      
+      # Twilio
+      - SMS_PROVIDER=twilio
+      - TWILIO_ACCOUNT_SID=AC_dummy_sid_to_pass_validation
+      - TWILIO_AUTH_TOKEN=dummy_token
+      - TWILIO_PHONE_NUMBER=+15005550006
+      - TWILIO_SID=SK_dummy
+      - TWILIO_SECRET=dummy_secret
+      
+      # --- SYSTEM ---
+      - DEPLOY_MODE=jvm
+      - LOG_LEVEL=INFO
+
 volumes:
   petpulse_data:

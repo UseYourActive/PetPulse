@@ -12,7 +12,6 @@ namespace PetPulse.API.Models
 
         public decimal Cost { get; set; } // Money type
 
-        // Navigation
         public ICollection<AppointmentTreatment> AppointmentTreatments { get; set; }
             = new List<AppointmentTreatment>();
     }

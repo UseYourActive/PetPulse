@@ -7,6 +7,7 @@ using PetPulse.API.Data;
 using PetPulse.API.DTOs;
 using PetPulse.API.Enums;
 using PetPulse.API.Models;
+using PetPulse.API.Services;
 
 namespace PetPulse.API.Controllers
 {
@@ -18,17 +19,20 @@ namespace PetPulse.API.Controllers
         private readonly IMapper _mapper;
         private readonly ILogger<AppointmentsController> _logger;
         private readonly UserManager<AppUser> _userManager;
+        private readonly INotificationService _notificationService;
 
         public AppointmentsController(
             ApplicationDbContext context,
             IMapper mapper,
             ILogger<AppointmentsController> logger,
-            UserManager<AppUser> userManager)
+            UserManager<AppUser> userManager,
+            INotificationService notificationService)
         {
             _context = context;
             _mapper = mapper;
             _logger = logger;
             _userManager = userManager;
+            _notificationService = notificationService;
         }
 
         // GET: api/appointments
@@ -47,7 +51,6 @@ namespace PetPulse.API.Controllers
                     .ThenInclude(at => at.Treatment)
                 .AsQueryable();
 
-            // 2. SECURITY FILTER: Isolation Logic
             if (!User.IsInRole(UserRoles.Admin))
             {
                 var username = User.Identity?.Name;
@@ -59,20 +62,17 @@ namespace PetPulse.API.Controllers
                         var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser.Id);
                         if (owner != null)
                         {
-                            // CRITICAL: Filter appointments where the Pet belongs to THIS owner
                             query = query.Where(a => a.Pet.OwnerId == owner.Id);
                         }
                     }
                 }
             }
 
-            // 3. Date Filtering
             if (filterDate.HasValue)
             {
                 query = query.Where(a => a.Date.Date == filterDate.Value.Date);
             }
 
-            // 4. Sorting
             switch (sortOrder?.ToLower())
             {
                 case "date_asc": query = query.OrderBy(a => a.Date); break;
@@ -104,14 +104,12 @@ namespace PetPulse.API.Controllers
 
             if (appointment == null) return NotFound();
 
-            // 5. SECURITY CHECK: Prevent viewing others' appointments
             if (!User.IsInRole(UserRoles.Admin))
             {
                 var username = User.Identity?.Name;
                 var appUser = await _userManager.FindByNameAsync(username!);
                 var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser!.Id);
 
-                // If the appointment's pet does not belong to the logged-in user -> 404
                 if (owner != null && appointment.Pet.OwnerId != owner.Id)
                 {
                     return NotFound();
@@ -129,15 +127,14 @@ namespace PetPulse.API.Controllers
             if (!Guid.TryParse(dto.PetId, out var petId)) return BadRequest("Invalid Pet ID.");
             if (!Guid.TryParse(dto.VetId, out var vetId)) return BadRequest("Invalid Vet ID.");
 
-            // Security: Ensure User owns the pet they are booking for
             if (!User.IsInRole(UserRoles.Admin))
             {
                 var username = User.Identity?.Name;
                 var appUser = await _userManager.FindByNameAsync(username!);
-                var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser!.Id);
+                var ownerCheck = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser!.Id);
 
-                var pet = await _context.Pets.FindAsync(petId);
-                if (pet == null || owner == null || pet.OwnerId != owner.Id)
+                var petCheck = await _context.Pets.FindAsync(petId);
+                if (petCheck == null || ownerCheck == null || petCheck.OwnerId != ownerCheck.Id)
                 {
                     return BadRequest("You can only book appointments for your own pets.");
                 }
@@ -154,10 +151,38 @@ namespace PetPulse.API.Controllers
             _context.Appointments.Add(appointment);
             await _context.SaveChangesAsync();
 
+            try
+            {
+                var pet = await _context.Pets.Include(p => p.Owner).FirstOrDefaultAsync(p => p.Id == petId);
+                var vet = await _context.Vets.FindAsync(vetId);
+                var owner = pet?.Owner;
+
+                if (owner != null && vet != null && pet != null && !string.IsNullOrEmpty(owner.PhoneNumber))
+                {
+                    var notificationData = new Dictionary<string, string>
+                    {
+                        { "firstName", owner.FirstName },
+                        { "taskCount", "1" },
+                        { "messageCount", "0" },
+                        { "nextEvent", $"Appointment for {pet.Name} with Dr. {vet.LastName} on {appointment.Date:MMM dd HH:mm} 🚀" }
+                    };
+
+                    _ = _notificationService.SendTelegramNotificationAsync(
+                        owner.PhoneNumber,
+                        "telegram/daily_reminder",
+                        notificationData
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send Telegram notification.");
+            }
+            // ============================================================
+
             var fullAppointment = await _context.Appointments
                 .Include(a => a.Vet)
-                .Include(a => a.Pet)
-                    .ThenInclude(p => p.Owner)
+                .Include(a => a.Pet).ThenInclude(p => p.Owner)
                 .FirstOrDefaultAsync(a => a.Id == appointment.Id);
 
             return CreatedAtAction(nameof(GetAppointment), new { id = appointment.Id.ToString() }, _mapper.Map<AppointmentDto>(fullAppointment));
@@ -173,7 +198,6 @@ namespace PetPulse.API.Controllers
             var appointment = await _context.Appointments.Include(a => a.Pet).FirstOrDefaultAsync(a => a.Id == appointmentId);
             if (appointment == null) return NotFound();
 
-            // Security Check
             if (!User.IsInRole(UserRoles.Admin))
             {
                 var username = User.Identity?.Name;
@@ -198,7 +222,6 @@ namespace PetPulse.API.Controllers
             var appointment = await _context.Appointments.Include(a => a.Pet).FirstOrDefaultAsync(a => a.Id == appointmentId);
             if (appointment == null) return NotFound();
 
-            // Security Check
             if (!User.IsInRole(UserRoles.Admin))
             {
                 var username = User.Identity?.Name;

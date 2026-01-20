@@ -27,7 +27,6 @@ namespace PetPulse.API.Controllers
         }
 
         // GET: api/pets?ownerId=...&search=daisy
-        // Meets requirement: Filtering and Searching
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PetDto>>> GetPets(
             [FromQuery] string? ownerId,
@@ -49,7 +48,6 @@ namespace PetPulse.API.Controllers
                         var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser.Id);
                         if (owner != null)
                         {
-                            // FORCE the filter: User can ONLY see their own pets
                             query = query.Where(p => p.OwnerId == owner.Id);
                         }
                     }
@@ -86,7 +84,6 @@ namespace PetPulse.API.Controllers
 
             if (pet == null) return NotFound();
 
-            // SECURITY CHECK: If standard user, prevent accessing someone else's pet via direct ID
             if (!User.IsInRole(UserRoles.Admin))
             {
                 var username = User.Identity?.Name;
@@ -195,24 +192,20 @@ namespace PetPulse.API.Controllers
         [HttpGet("{id}/appointments")]
         public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetPetAppointments(string id)
         {
-            // 1. Validate ID format
             if (!Guid.TryParse(id, out var petId)) return BadRequest("Invalid Pet ID format.");
 
-            // 2. Check if Pet exists
             var pet = await _context.Pets.FindAsync(petId);
             if (pet == null) return NotFound("Pet not found.");
 
-            // 3. SECURITY: Ensure the user owns this pet (or is Admin)
             if (!User.IsInRole(UserRoles.Admin))
             {
                 var username = User.Identity?.Name;
                 var appUser = await _userManager.FindByNameAsync(username!);
                 var owner = await _context.Owners.FirstOrDefaultAsync(o => o.AppUserId == appUser!.Id);
 
-                // If user doesn't own the pet, block access
                 if (owner == null || pet.OwnerId != owner.Id)
                 {
-                    return NotFound(); // Hide existence of the pet
+                    return NotFound();
                 }
             }
 
@@ -223,7 +216,7 @@ namespace PetPulse.API.Controllers
                 .Include(a => a.Vet)
                 .Include(a => a.AppointmentTreatments)
                     .ThenInclude(at => at.Treatment)
-                .OrderByDescending(a => a.Date) // Sort by newest first (History style)
+                .OrderByDescending(a => a.Date)
                 .ToListAsync();
 
             return Ok(_mapper.Map<List<AppointmentDto>>(appointments));
