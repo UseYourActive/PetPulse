@@ -41,6 +41,10 @@ namespace PetPulse.API
             CreateMap<Review, ReviewDto>()
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Owner.FirstName + " " + src.Owner.LastName));
             CreateMap<CreateReviewDto, Review>();
+
+            CreateMap<Vaccine, VaccineDto>()
+                .ForMember(dest => dest.PetName, opt => opt.MapFrom(src => src.Pet.Name));
+            CreateMap<CreateVaccineDto, Vaccine>();
         }
     }
 }

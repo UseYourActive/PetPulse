@@ -140,6 +140,31 @@ namespace PetPulse.API.Data
                     }
                 };
 
+                // 3.5 Create Vaccines (New!)
+                var petDaisy = context.Pets.First(p => p.Name == "Daisy");
+                if (!context.Vaccines.Any())
+                {
+                    var vaccines = new List<Vaccine>
+                    {
+                        new Vaccine
+                        {
+                            Name = "Rabies",
+                            DateAdministered = DateTime.UtcNow.AddMonths(-6),
+                            ExpiryDate = DateTime.UtcNow.AddMonths(6),
+                            PetId = petDaisy.Id
+                        },
+                        new Vaccine
+                        {
+                            Name = "Distemper",
+                            DateAdministered = DateTime.UtcNow.AddMonths(-1),
+                            ExpiryDate = DateTime.UtcNow.AddMonths(11),
+                            PetId = petDaisy.Id
+                        }
+                     };
+                    context.Vaccines.AddRange(vaccines);
+                    await context.SaveChangesAsync();
+                }
+
                 context.Appointments.AddRange(appointments);
                 await context.SaveChangesAsync();
             }

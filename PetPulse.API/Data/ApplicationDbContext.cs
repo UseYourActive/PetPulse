@@ -20,6 +20,7 @@ namespace PetPulse.API.Data
         public DbSet<Treatment> Treatments { get; set; }
         public DbSet<AppointmentTreatment> AppointmentTreatments { get; set; }
         public DbSet<Review> Reviews { get; set; }
+        public DbSet<Vaccine> Vaccines { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
